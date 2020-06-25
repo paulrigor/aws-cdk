@@ -4,7 +4,9 @@
       "Type": "AWS::Logs::LogGroup",
       "Properties": {
         "RetentionInDays": 731
-      }
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
     },
     "MetricFilter1B93B6E5": {
       "Type": "AWS::Logs::MetricFilter",

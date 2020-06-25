@@ -1,18 +1,32 @@
-import { Construct, Resource, Stack, Token } from "@aws-cdk/cdk";
+import { Construct, Lazy, Resource, Stack, Token } from '@aws-cdk/core';
 import { CfnDashboard } from './cloudwatch.generated';
-import { Column, Row } from "./layout";
-import { IWidget } from "./widget";
+import { Column, Row } from './layout';
+import { IWidget } from './widget';
 
+/**
+ * Specify the period for graphs when the CloudWatch dashboard loads
+ */
 export enum PeriodOverride {
-  Auto = 'auto',
-  Inherit = 'inherit',
+  /**
+   * Period of all graphs on the dashboard automatically adapt to the time range of the dashboard.
+   */
+  AUTO = 'auto',
+  /**
+   * Period set for each graph will be used
+   */
+  INHERIT = 'inherit',
 }
 
+/**
+ * Properties for defining a CloudWatch Dashboard
+ */
 export interface DashboardProps {
   /**
-   * Name of the dashboard
+   * Name of the dashboard.
    *
-   * @default Automatically generated name
+   * If set, must only contain alphanumerics, dash (-) and underscore (_)
+   *
+   * @default - automatically generated name
    */
   readonly dashboardName?: string;
 
@@ -45,6 +59,15 @@ export interface DashboardProps {
    * @default Auto
    */
   readonly periodOverride?: PeriodOverride;
+
+  /**
+   * Initial set of widgets on the dashboard
+   *
+   * One array represents a row of widgets.
+   *
+   * @default - No widgets
+   */
+  readonly widgets?: IWidget[][]
 }
 
 /**
@@ -53,21 +76,37 @@ export interface DashboardProps {
 export class Dashboard extends Resource {
   private readonly rows: IWidget[] = [];
 
-  constructor(scope: Construct, id: string, props?: DashboardProps) {
-    super(scope, id);
+  constructor(scope: Construct, id: string, props: DashboardProps = {}) {
+    super(scope, id, {
+      physicalName: props.dashboardName,
+    });
+
+    {
+      const {dashboardName} = props;
+      if (dashboardName && !Token.isUnresolved(dashboardName) && !dashboardName.match(/^[\w-]+$/)) {
+        throw new Error([
+          `The value ${dashboardName} for field dashboardName contains invalid characters.`,
+          'It can only contain alphanumerics, dash (-) and underscore (_).',
+        ].join(' '));
+      }
+    }
 
     new CfnDashboard(this, 'Resource', {
-      dashboardName: (props && props.dashboardName) || undefined,
-      dashboardBody: new Token(() => {
+      dashboardName: this.physicalName,
+      dashboardBody: Lazy.stringValue({ produce: () => {
         const column = new Column(...this.rows);
         column.position(0, 0);
         return Stack.of(this).toJsonString({
-          start: props ? props.start : undefined,
-          end: props ? props.end : undefined,
-          periodOverride: props ? props.periodOverride : undefined,
+          start: props.start,
+          end: props.end,
+          periodOverride: props.periodOverride,
           widgets: column.toJson(),
         });
-      }).toString()
+      }}),
+    });
+
+    (props.widgets || []).forEach(row => {
+      this.addWidgets(...row);
     });
   }
 
@@ -80,7 +119,7 @@ export class Dashboard extends Resource {
    * Multiple widgets added in the same call to add() will be laid out next
    * to each other.
    */
-  public add(...widgets: IWidget[]) {
+  public addWidgets(...widgets: IWidget[]) {
     if (widgets.length === 0) {
       return;
     }

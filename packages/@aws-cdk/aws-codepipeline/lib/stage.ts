@@ -1,10 +1,11 @@
-import events = require('@aws-cdk/aws-events');
-import cdk = require('@aws-cdk/cdk');
-import { Action, IPipeline, IStage } from "./action";
-import { Artifact } from "./artifact";
+import * as events from '@aws-cdk/aws-events';
+import * as cdk from '@aws-cdk/core';
+import { IAction, IPipeline, IStage } from './action';
+import { Artifact } from './artifact';
 import { CfnPipeline } from './codepipeline.generated';
+import { FullActionDescriptor } from './full-action-descriptor';
 import { Pipeline, StageProps } from './pipeline';
-import { validateName } from "./validation";
+import * as validation from './validation';
 
 /**
  * A Stage in a Pipeline.
@@ -18,19 +19,19 @@ export class Stage implements IStage {
   /**
    * The Pipeline this Stage is a part of.
    */
-  public readonly pipeline: IPipeline;
   public readonly stageName: string;
   private readonly scope: cdk.Construct;
-  private readonly _actions = new Array<Action>();
+  private readonly _pipeline: Pipeline;
+  private readonly _actions = new Array<FullActionDescriptor>();
 
   /**
    * Create a new Stage.
    */
   constructor(props: StageProps, pipeline: Pipeline) {
-    validateName('Stage', props.name);
+    validation.validateName('Stage', props.stageName);
 
-    this.stageName = props.name;
-    this.pipeline = pipeline;
+    this.stageName = props.stageName;
+    this._pipeline = pipeline;
     this.scope = new cdk.Construct(pipeline, this.stageName);
 
     for (const action of props.actions || []) {
@@ -41,22 +42,31 @@ export class Stage implements IStage {
   /**
    * Get a duplicate of this stage's list of actions.
    */
-  public get actions(): Action[] {
+  public get actionDescriptors(): FullActionDescriptor[] {
     return this._actions.slice();
+  }
+
+  public get actions(): IAction[] {
+    return this._actions.map(actionDescriptor => actionDescriptor.action);
+  }
+
+  public get pipeline(): IPipeline {
+    return this._pipeline;
   }
 
   public render(): CfnPipeline.StageDeclarationProperty {
     // first, assign names to output Artifacts who don't have one
-    for (const action of this.actions) {
+    for (const action of this._actions) {
       const outputArtifacts = action.outputs;
 
       const unnamedOutputs = outputArtifacts.filter(o => !o.artifactName);
 
       for (const outputArtifact of outputArtifacts) {
         if (!outputArtifact.artifactName) {
-          const artifactName = `Artifact_${this.stageName}_${action.actionName}` + (unnamedOutputs.length === 1
+          const unsanitizedArtifactName = `Artifact_${this.stageName}_${action.actionName}` + (unnamedOutputs.length === 1
             ? ''
             : '_' + (unnamedOutputs.indexOf(outputArtifact) + 1));
+          const artifactName = sanitizeArtifactName(unsanitizedArtifactName);
           (outputArtifact as any)._setName(artifactName);
         }
       }
@@ -68,14 +78,17 @@ export class Stage implements IStage {
     };
   }
 
-  public addAction(action: Action): void {
+  public addAction(action: IAction): void {
+    const actionName = action.actionProperties.actionName;
+    // validate the name
+    validation.validateName('Action', actionName);
+
     // check for duplicate Actions and names
-    if (this._actions.find(a => a.actionName === action.actionName)) {
-      throw new Error(`Stage ${this.stageName} already contains an action with name '${action.actionName}'`);
+    if (this._actions.find(a => a.actionName === actionName)) {
+      throw new Error(`Stage ${this.stageName} already contains an action with name '${actionName}'`);
     }
 
-    this._actions.push(action);
-    this.attachActionToPipeline(action);
+    this._actions.push(this.attachActionToPipeline(action));
   }
 
   public onStateChange(name: string, target?: events.IRuleTarget, options?: events.RuleProps): events.Rule {
@@ -108,21 +121,29 @@ export class Stage implements IStage {
 
   private validateActions(): string[] {
     const ret = new Array<string>();
-    for (const action of this.actions) {
-      ret.push(...action._validate());
+    for (const action of this.actionDescriptors) {
+      ret.push(...this.validateAction(action));
     }
     return ret;
   }
 
-  private attachActionToPipeline(action: Action) {
-    // notify the Pipeline of the new Action
-    const actionScope = new cdk.Construct(this.scope, action.actionName);
-    (this.pipeline as any)._attachActionToPipeline(this, action, actionScope);
+  private validateAction(action: FullActionDescriptor): string[] {
+    return validation.validateArtifactBounds('input', action.inputs, action.artifactBounds.minInputs,
+      action.artifactBounds.maxInputs, action.category, action.provider)
+      .concat(validation.validateArtifactBounds('output', action.outputs, action.artifactBounds.minOutputs,
+        action.artifactBounds.maxOutputs, action.category, action.provider),
+      );
   }
 
-  private renderAction(action: Action): CfnPipeline.ActionDeclarationProperty {
-    const outputArtifacts = this.renderArtifacts(action.outputs);
-    const inputArtifacts = this.renderArtifacts(action.inputs);
+  private attachActionToPipeline(action: IAction): FullActionDescriptor {
+    // notify the Pipeline of the new Action
+    const actionScope = new cdk.Construct(this.scope, action.actionProperties.actionName);
+    return this._pipeline._attachActionToPipeline(this, action, actionScope);
+  }
+
+  private renderAction(action: FullActionDescriptor): CfnPipeline.ActionDeclarationProperty {
+    const outputArtifacts = cdk.Lazy.anyValue({ produce: () =>  this.renderArtifacts(action.outputs) }, { omitEmptyArray: true});
+    const inputArtifacts = cdk.Lazy.anyValue({ produce: () =>  this.renderArtifacts(action.inputs)}, { omitEmptyArray: true});
     return {
       name: action.actionName,
       inputArtifacts,
@@ -137,6 +158,7 @@ export class Stage implements IStage {
       runOrder: action.runOrder,
       roleArn: action.role ? action.role.roleArn : undefined,
       region: action.region,
+      namespace: action.namespace,
     };
   }
 
@@ -145,4 +167,10 @@ export class Stage implements IStage {
       .filter(a => a.artifactName)
       .map(a => ({ name: a.artifactName! }));
   }
+}
+
+function sanitizeArtifactName(artifactName: string): string {
+  // strip out some characters that are legal in Stage and Action names,
+  // but not in Artifact names
+  return artifactName.replace(/[@.]/g, '');
 }

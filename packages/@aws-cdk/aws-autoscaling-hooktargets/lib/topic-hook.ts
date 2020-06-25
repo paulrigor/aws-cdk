@@ -1,6 +1,6 @@
-import autoscaling = require('@aws-cdk/aws-autoscaling');
-import sns = require('@aws-cdk/aws-sns');
-import { Construct } from '@aws-cdk/cdk';
+import * as autoscaling from '@aws-cdk/aws-autoscaling';
+import * as sns from '@aws-cdk/aws-sns';
+import { Construct } from '@aws-cdk/core';
 
 /**
  * Use an SNS topic as a hook target

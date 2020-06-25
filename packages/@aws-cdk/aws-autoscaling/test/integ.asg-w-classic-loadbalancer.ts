@@ -1,19 +1,19 @@
 #!/usr/bin/env node
-import ec2 = require('@aws-cdk/aws-ec2');
-import elb = require('@aws-cdk/aws-elasticloadbalancing');
-import cdk = require('@aws-cdk/cdk');
-import autoscaling = require('../lib');
+import * as ec2 from '@aws-cdk/aws-ec2';
+import * as elb from '@aws-cdk/aws-elasticloadbalancing';
+import * as cdk from '@aws-cdk/core';
+import * as autoscaling from '../lib';
 
 const app = new cdk.App();
 const stack = new cdk.Stack(app, 'aws-cdk-asg-integ');
 
 const vpc = new ec2.Vpc(stack, 'VPC', {
-  maxAZs: 3
+  maxAzs: 3,
 });
 
 const asg = new autoscaling.AutoScalingGroup(stack, 'Fleet', {
   vpc,
-  instanceType: new ec2.InstanceTypePair(ec2.InstanceClass.Burstable2, ec2.InstanceSize.Micro),
+  instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.MICRO),
   machineImage: new ec2.AmazonLinuxImage(),
 });
 
@@ -21,7 +21,7 @@ const lb = new elb.LoadBalancer(stack, 'LB', {
   vpc,
   internetFacing: true,
   healthCheck: {
-    port: 80
+    port: 80,
   },
 });
 

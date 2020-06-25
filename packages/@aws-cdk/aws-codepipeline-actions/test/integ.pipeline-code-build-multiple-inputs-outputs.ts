@@ -1,9 +1,9 @@
-import codebuild = require('@aws-cdk/aws-codebuild');
-import codecommit = require('@aws-cdk/aws-codecommit');
-import codepipeline = require('@aws-cdk/aws-codepipeline');
-import s3 = require('@aws-cdk/aws-s3');
-import cdk = require('@aws-cdk/cdk');
-import cpactions = require('../lib');
+import * as codebuild from '@aws-cdk/aws-codebuild';
+import * as codecommit from '@aws-cdk/aws-codecommit';
+import * as codepipeline from '@aws-cdk/aws-codepipeline';
+import * as s3 from '@aws-cdk/aws-s3';
+import * as cdk from '@aws-cdk/core';
+import * as cpactions from '../lib';
 
 const app = new cdk.App();
 
@@ -14,18 +14,20 @@ const repository = new codecommit.Repository(stack, 'MyRepo', {
 });
 const bucket = new s3.Bucket(stack, 'MyBucket', {
   versioned: true,
-  removalPolicy: cdk.RemovalPolicy.Destroy,
+  removalPolicy: cdk.RemovalPolicy.DESTROY,
 });
 
 const pipeline = new codepipeline.Pipeline(stack, 'Pipeline', {
   artifactBucket: bucket,
 });
+const pipelineRole = pipeline.role;
 
 const source1Output = new codepipeline.Artifact();
 const sourceAction1 = new cpactions.CodeCommitSourceAction({
   actionName: 'Source1',
   repository,
   output: source1Output,
+  role: pipelineRole,
 });
 const source2Output = new codepipeline.Artifact();
 const sourceAction2 = new cpactions.S3SourceAction({
@@ -33,16 +35,19 @@ const sourceAction2 = new cpactions.S3SourceAction({
   bucketKey: 'some/path',
   bucket,
   output: source2Output,
+  role: pipelineRole,
 });
 pipeline.addStage({
-  name: 'Source',
+  stageName: 'Source',
   actions: [
     sourceAction1,
     sourceAction2,
   ],
 });
 
-const project = new codebuild.PipelineProject(stack, 'MyBuildProject');
+const project = new codebuild.PipelineProject(stack, 'MyBuildProject', {
+  grantReportGroupPermissions: false,
+});
 const buildAction = new cpactions.CodeBuildAction({
   actionName: 'Build1',
   project,
@@ -50,10 +55,11 @@ const buildAction = new cpactions.CodeBuildAction({
   extraInputs: [
     source2Output,
   ],
-  output: new codepipeline.Artifact(),
-  extraOutputs: [
+  outputs: [
+    new codepipeline.Artifact(),
     new codepipeline.Artifact(),
   ],
+  role: pipelineRole,
 });
 const testAction = new cpactions.CodeBuildAction({
   type: cpactions.CodeBuildActionType.TEST,
@@ -63,12 +69,13 @@ const testAction = new cpactions.CodeBuildAction({
   extraInputs: [
     source1Output,
   ],
-  extraOutputs: [
+  outputs: [
     new codepipeline.Artifact('CustomOutput2'),
   ],
+  role: pipelineRole,
 });
 pipeline.addStage({
-  name: 'Build',
+  stageName: 'Build',
   actions: [
     buildAction,
     testAction,

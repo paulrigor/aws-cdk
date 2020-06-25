@@ -1,6 +1,6 @@
-import ecr = require('@aws-cdk/aws-ecr');
-import cdk = require('@aws-cdk/cdk');
-import codebuild = require('../lib');
+import * as ecr from '@aws-cdk/aws-ecr';
+import * as cdk from '@aws-cdk/core';
+import * as codebuild from '../lib';
 
 class TestStack extends cdk.Stack {
   constructor(scope: cdk.App, id: string) {
@@ -9,18 +9,19 @@ class TestStack extends cdk.Stack {
     const ecrRepository = new ecr.Repository(this, 'MyRepo');
 
     new codebuild.Project(this, 'MyProject', {
-      buildSpec: {
-        version: "0.2",
+      buildSpec: codebuild.BuildSpec.fromObject({
+        version: '0.2',
         phases: {
           build: {
-            commands: [ 'ls' ]
-          }
-        }
-      },
+            commands: [ 'ls' ],
+          },
+        },
+      }),
+      grantReportGroupPermissions: false,
       /// !show
       environment: {
-        buildImage: codebuild.LinuxBuildImage.fromEcrRepository(ecrRepository, "v1.0")
-      }
+        buildImage: codebuild.LinuxBuildImage.fromEcrRepository(ecrRepository, 'v1.0'),
+      },
       /// !hide
     });
   }

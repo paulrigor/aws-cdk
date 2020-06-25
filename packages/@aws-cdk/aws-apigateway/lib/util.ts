@@ -1,5 +1,9 @@
 import { format as formatUrl } from 'url';
-const ALLOWED_METHODS = [ 'ANY', 'DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT' ];
+import * as jsonSchema from './json-schema';
+
+export const ALL_METHODS = [ 'OPTIONS', 'GET', 'PUT', 'POST', 'DELETE', 'PATCH', 'HEAD' ];
+
+const ALLOWED_METHODS = [ 'ANY', ...ALL_METHODS ];
 
 export function validateHttpMethod(method: string, messagePrefix: string = '') {
   if (!ALLOWED_METHODS.includes(method)) {
@@ -34,13 +38,13 @@ export function parseMethodOptionsPath(originalPath: string): { resourcePath: st
 
   return {
     httpMethod,
-    resourcePath
+    resourcePath,
   };
 }
 
 export function parseAwsApiCall(path?: string, action?: string, actionParams?: { [key: string]: string }): { apiType: string, apiValue: string } {
   if (actionParams && !action) {
-    throw new Error(`"actionParams" requires that "action" will be set`);
+    throw new Error('"actionParams" requires that "action" will be set');
   }
 
   if (path && action) {
@@ -50,7 +54,7 @@ export function parseAwsApiCall(path?: string, action?: string, actionParams?: {
   if (path) {
     return {
       apiType: 'path',
-      apiValue: path
+      apiValue: path,
     };
   }
 
@@ -61,15 +65,59 @@ export function parseAwsApiCall(path?: string, action?: string, actionParams?: {
 
     return {
       apiType: 'action',
-      apiValue: action
+      apiValue: action,
     };
   }
 
-  throw new Error(`Either "path" or "action" are required`);
+  throw new Error('Either "path" or "action" are required');
 }
 
 export function validateInteger(property: number | undefined, messagePrefix: string) {
   if (property && !Number.isInteger(property)) {
     throw new Error(`${messagePrefix} should be an integer`);
+  }
+}
+
+export class JsonSchemaMapper {
+  /**
+   * Transforms naming of some properties to prefix with a $, where needed
+   * according to the JSON schema spec
+   * @param schema The JsonSchema object to transform for CloudFormation output
+   */
+  public static toCfnJsonSchema(schema: jsonSchema.JsonSchema): any {
+    const result = JsonSchemaMapper._toCfnJsonSchema(schema);
+    if (! ('$schema' in result)) {
+      result.$schema = jsonSchema.JsonSchemaVersion.DRAFT4;
+    }
+    return result;
+  }
+
+  private static readonly SchemaPropsWithPrefix: { [key: string]: string } = {
+    schema: '$schema',
+    ref: '$ref',
+    id: '$id',
+  };
+  // The value indicates whether direct children should be key-mapped.
+  private static readonly SchemaPropsWithUserDefinedChildren: { [key: string]: boolean } = {
+    definitions: true,
+    properties: true,
+    patternProperties: true,
+    dependencies: true,
+  };
+
+  private static _toCfnJsonSchema(schema: any, preserveKeys = false): any {
+    if (schema == null || typeof schema !== 'object') {
+      return schema;
+    }
+    if (Array.isArray(schema)) {
+      return schema.map(entry => JsonSchemaMapper._toCfnJsonSchema(entry));
+    }
+    return Object.assign({}, ...Object.entries(schema).map(([key, value]) => {
+      const mapKey = !preserveKeys && (key in JsonSchemaMapper.SchemaPropsWithPrefix);
+      const newKey = mapKey ? JsonSchemaMapper.SchemaPropsWithPrefix[key] : key;
+      // If keys were preserved, don't consider SchemaPropsWithUserDefinedChildren for those keys (they are user-defined!)
+      const newValue = JsonSchemaMapper._toCfnJsonSchema(value, !preserveKeys && JsonSchemaMapper.SchemaPropsWithUserDefinedChildren[key]);
+      return { [newKey]: newValue };
+    }));
   }
 }

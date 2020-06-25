@@ -1,13 +1,14 @@
-import cdk = require('@aws-cdk/cdk');
-import { ActionCategory } from "./action";
-import { Artifact } from "./artifact";
+import * as cdk from '@aws-cdk/core';
+import { ActionCategory } from './action';
+import { Artifact } from './artifact';
 
 /**
  * Validation function that checks if the number of artifacts is within the given bounds
  */
-export function validateArtifactBounds( type: string, artifacts: Artifact[],
-                                        min: number, max: number,
-                                        category: string, provider: string): string[] {
+export function validateArtifactBounds(
+  type: string, artifacts: Artifact[],
+  min: number, max: number,
+  category: string, provider: string): string[] {
   const ret: string[] = [];
 
   if (artifacts.length < min) {
@@ -26,7 +27,7 @@ export function validateArtifactBounds( type: string, artifacts: Artifact[],
  * in the first stage of a pipeline, and the first stage can only contain source actions.
  */
 export function validateSourceAction(mustBeSource: boolean, category: string, actionName: string, stageName: string): string[] {
-  if (mustBeSource !== (category === ActionCategory.Source)) {
+  if (mustBeSource !== (category === ActionCategory.SOURCE)) {
     return [`Action ${actionName} in stage ${stageName}: ` + (mustBeSource ? 'first stage may only contain Source actions'
       : 'Source actions may only occur in first stage')];
   }
@@ -53,9 +54,13 @@ export function validateArtifactName(artifactName: string | undefined): void {
   validateAgainstRegex(/^[a-zA-Z0-9_-]{1,100}$/, 'Artifact', artifactName);
 }
 
+export function validateNamespaceName(namespaceName: string | undefined): void {
+  validateAgainstRegex(/^[A-Za-z0-9@_-]{1,100}$/, 'Namespace', namespaceName);
+}
+
 function validateAgainstRegex(regex: RegExp, thing: string, name: string | undefined) {
   // name could be a Token - in that case, skip validation altogether
-  if (cdk.Token.isToken(name)) {
+  if (cdk.Token.isUnresolved(name)) {
     return;
   }
 

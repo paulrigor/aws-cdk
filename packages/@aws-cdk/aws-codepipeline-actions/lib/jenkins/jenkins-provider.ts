@@ -1,6 +1,6 @@
-import codepipeline = require('@aws-cdk/aws-codepipeline');
-import cdk = require('@aws-cdk/cdk');
-import { CustomActionRegistration } from "../custom-action-registration";
+import * as codepipeline from '@aws-cdk/aws-codepipeline';
+import * as cdk from '@aws-cdk/core';
+import { CustomActionRegistration } from '../custom-action-registration';
 
 /**
  * A Jenkins provider.
@@ -170,7 +170,7 @@ export class JenkinsProvider extends BaseJenkinsProvider {
       return;
     }
     this.buildIncluded = true;
-    this.registerJenkinsCustomAction('JenkinsBuildProviderResource', codepipeline.ActionCategory.Build);
+    this.registerJenkinsCustomAction('JenkinsBuildProviderResource', codepipeline.ActionCategory.BUILD);
   }
 
   /**
@@ -181,7 +181,7 @@ export class JenkinsProvider extends BaseJenkinsProvider {
       return;
     }
     this.testIncluded = true;
-    this.registerJenkinsCustomAction('JenkinsTestProviderResource', codepipeline.ActionCategory.Test);
+    this.registerJenkinsCustomAction('JenkinsTestProviderResource', codepipeline.ActionCategory.TEST);
   }
 
   private registerJenkinsCustomAction(id: string, category: codepipeline.ActionCategory) {
@@ -232,5 +232,5 @@ export const jenkinsArtifactsBounds: codepipeline.ActionArtifactBounds = {
   minInputs: 0,
   maxInputs: 5,
   minOutputs: 0,
-  maxOutputs: 5
+  maxOutputs: 5,
 };

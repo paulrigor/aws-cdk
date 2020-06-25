@@ -1,6 +1,5 @@
-import iam = require('@aws-cdk/aws-iam');
-import cdk = require('@aws-cdk/cdk');
-import { Stack } from '@aws-cdk/cdk';
+import * as iam from '@aws-cdk/aws-iam';
+import * as cdk from '@aws-cdk/core';
 import { Function as LambdaFunction, FunctionProps } from './function';
 import { FunctionBase, IFunction } from './function-base';
 import { Permission } from './permission';
@@ -32,8 +31,10 @@ export interface SingletonFunctionProps extends FunctionProps {
 /**
  * A Lambda that will only ever be added to a stack once.
  *
- * The lambda is identified using the value of 'uuid'. Run 'uuidgen'
- * for every SingletonLambda you create.
+ * This construct is a way to guarantee that the lambda function will be guaranteed to be part of the stack,
+ * once and only once, irrespective of how many times the construct is declared to be part of the stack.
+ * This is guaranteed as long as the `uuid` property and the optional `lambdaPurpose` property stay the same
+ * whenever they're declared into the stack.
  *
  * @resource AWS::Lambda::Function
  */
@@ -42,6 +43,7 @@ export class SingletonFunction extends FunctionBase {
   public readonly functionName: string;
   public readonly functionArn: string;
   public readonly role?: iam.IRole;
+  public readonly permissionsNode: cdk.ConstructNode;
   protected readonly canCreatePermissions: boolean;
   private lambdaFunction: IFunction;
 
@@ -49,6 +51,7 @@ export class SingletonFunction extends FunctionBase {
     super(scope, id);
 
     this.lambdaFunction = this.ensureLambda(props);
+    this.permissionsNode = this.lambdaFunction.node;
 
     this.functionArn = this.lambdaFunction.functionArn;
     this.functionName = this.lambdaFunction.functionName;
@@ -62,15 +65,39 @@ export class SingletonFunction extends FunctionBase {
     return this.lambdaFunction.addPermission(name, permission);
   }
 
+  /**
+   * Using node.addDependency() does not work on this method as the underlying lambda function is modeled
+   * as a singleton across the stack. Use this method instead to declare dependencies.
+   */
+  public addDependency(...up: cdk.IDependable[]) {
+    this.lambdaFunction.node.addDependency(...up);
+  }
+
+  /**
+   * The SingletonFunction construct cannot be added as a dependency of another construct using
+   * node.addDependency(). Use this method instead to declare this as a dependency of another construct.
+   */
+  public dependOn(down: cdk.IConstruct) {
+    down.node.addDependency(this.lambdaFunction);
+  }
+
+  /**
+   * Returns the construct tree node that corresponds to the lambda function.
+   * @internal
+   */
+  protected _functionNode(): cdk.ConstructNode {
+    return this.lambdaFunction.node;
+  }
+
   private ensureLambda(props: SingletonFunctionProps): IFunction {
     const constructName = (props.lambdaPurpose || 'SingletonLambda') + slugify(props.uuid);
-    const existing = Stack.of(this).node.tryFindChild(constructName);
+    const existing = cdk.Stack.of(this).node.tryFindChild(constructName);
     if (existing) {
       // Just assume this is true
       return existing as FunctionBase;
     }
 
-    return new LambdaFunction(Stack.of(this), constructName, props);
+    return new LambdaFunction(cdk.Stack.of(this), constructName, props);
   }
 }
 

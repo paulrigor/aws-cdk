@@ -26,13 +26,14 @@
       }
     },
     "Bucket83908E77": {
-      "Type": "AWS::S3::Bucket"
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
     },
     "MyDistributionCFDistributionDE147309": {
       "Type": "AWS::CloudFront::Distribution",
       "Properties": {
         "DistributionConfig": {
-          "CacheBehaviors": [],
           "DefaultCacheBehavior": {
             "AllowedMethods": [
               "GET",
@@ -42,6 +43,7 @@
               "GET",
               "HEAD"
             ],
+            "Compress": true,
             "ForwardedValues": {
               "Cookies": {
                 "Forward": "none"

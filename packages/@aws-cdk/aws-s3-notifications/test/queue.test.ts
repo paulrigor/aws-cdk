@@ -1,9 +1,9 @@
 import { SynthUtils } from '@aws-cdk/assert';
 import '@aws-cdk/assert/jest';
-import s3 = require('@aws-cdk/aws-s3');
-import sqs = require('@aws-cdk/aws-sqs');
-import { Stack } from '@aws-cdk/cdk';
-import notif = require('../lib');
+import * as s3 from '@aws-cdk/aws-s3';
+import * as sqs from '@aws-cdk/aws-sqs';
+import { Stack } from '@aws-cdk/core';
+import * as notif from '../lib';
 
 test('queues can be used as destinations', () => {
   const stack = new Stack();
@@ -18,54 +18,51 @@ test('queues can be used as destinations', () => {
       Statement: [
         {
           Action: [
-            "sqs:SendMessage",
-            "sqs:SendMessageBatch",
-            "sqs:GetQueueAttributes",
-            "sqs:GetQueueUrl"
+            'sqs:SendMessage',
+            'sqs:GetQueueAttributes',
+            'sqs:GetQueueUrl',
           ],
           Condition: {
             ArnLike: {
-              "aws:SourceArn": { "Fn::GetAtt": [ "Bucket83908E77", "Arn" ] }
-            }
+              'aws:SourceArn': { 'Fn::GetAtt': [ 'Bucket83908E77', 'Arn' ] },
+            },
           },
-          Effect: "Allow",
+          Effect: 'Allow',
           Principal: {
-            Service: {
-              "Fn::Join": ["", ["s3.", { Ref: "AWS::URLSuffix" }]]
-            }
+            Service: 's3.amazonaws.com',
           },
-          Resource: { "Fn::GetAtt": [ "Queue4A7E3555", "Arn" ] }
+          Resource: { 'Fn::GetAtt': [ 'Queue4A7E3555', 'Arn' ] },
 
-        }
+        },
       ],
-      Version: "2012-10-17"
+      Version: '2012-10-17',
     },
     Queues: [
       {
-        Ref: "Queue4A7E3555"
-      }
-    ]
+        Ref: 'Queue4A7E3555',
+      },
+    ],
   });
 
   expect(stack).toHaveResource('Custom::S3BucketNotifications', {
     BucketName: {
-      Ref: "Bucket83908E77"
+      Ref: 'Bucket83908E77',
     },
     NotificationConfiguration: {
       QueueConfigurations: [
         {
           Events: [
-            "s3:ObjectRemoved:*"
+            's3:ObjectRemoved:*',
           ],
           QueueArn: {
-            "Fn::GetAtt": [
-              "Queue4A7E3555",
-              "Arn"
-            ]
-          }
-        }
-      ]
-    }
+            'Fn::GetAtt': [
+              'Queue4A7E3555',
+              'Arn',
+            ],
+          },
+        },
+      ],
+    },
   });
 
   // make sure the queue policy is added as a dependency to the bucket
@@ -76,7 +73,7 @@ test('queues can be used as destinations', () => {
 test('if the queue is encrypted with a custom kms key, the key resource policy is updated to allow s3 to read messages', () => {
   const stack = new Stack();
   const bucket = new s3.Bucket(stack, 'Bucket');
-  const queue = new sqs.Queue(stack, 'Queue', { encryption: sqs.QueueEncryption.Kms });
+  const queue = new sqs.Queue(stack, 'Queue', { encryption: sqs.QueueEncryption.KMS });
 
   bucket.addObjectCreatedNotification(new notif.SqsDestination(queue));
 
@@ -85,67 +82,60 @@ test('if the queue is encrypted with a custom kms key, the key resource policy i
       Statement: [
         {
           Action: [
-            "kms:Create*",
-            "kms:Describe*",
-            "kms:Enable*",
-            "kms:List*",
-            "kms:Put*",
-            "kms:Update*",
-            "kms:Revoke*",
-            "kms:Disable*",
-            "kms:Get*",
-            "kms:Delete*",
-            "kms:ScheduleKeyDeletion",
-            "kms:CancelKeyDeletion"
+            'kms:Create*',
+            'kms:Describe*',
+            'kms:Enable*',
+            'kms:List*',
+            'kms:Put*',
+            'kms:Update*',
+            'kms:Revoke*',
+            'kms:Disable*',
+            'kms:Get*',
+            'kms:Delete*',
+            'kms:ScheduleKeyDeletion',
+            'kms:CancelKeyDeletion',
+            'kms:GenerateDataKey',
+            'kms:TagResource',
+            'kms:UntagResource',
           ],
-          Effect: "Allow",
+          Effect: 'Allow',
           Principal: {
-            AWS: { "Fn::Join": [ "", [ "arn:", { Ref: "AWS::Partition" }, ":iam::", { Ref: "AWS::AccountId" }, ":root" ] ] }
+            AWS: { 'Fn::Join': [ '', [ 'arn:', { Ref: 'AWS::Partition' }, ':iam::', { Ref: 'AWS::AccountId' }, ':root' ] ] },
           },
-          Resource: "*"
+          Resource: '*',
         },
         {
           Action: [
-            "kms:Encrypt",
-            "kms:ReEncrypt*",
-            "kms:GenerateDataKey*"
+            'kms:Decrypt',
+            'kms:Encrypt',
+            'kms:ReEncrypt*',
+            'kms:GenerateDataKey*',
           ],
           Condition: {
             ArnLike: {
-              "aws:SourceArn": { "Fn::GetAtt": [ "Bucket83908E77", "Arn" ] }
-            }
+              'aws:SourceArn': { 'Fn::GetAtt': [ 'Bucket83908E77', 'Arn' ] },
+            },
           },
-          Effect: "Allow",
+          Effect: 'Allow',
           Principal: {
-            Service: { "Fn::Join": [ "", [ "s3.", { Ref: "AWS::URLSuffix" } ] ] }
+            Service: 's3.amazonaws.com',
           },
-          Resource: "*"
+          Resource: '*',
         },
         {
           Action: [
-            "kms:GenerateDataKey*",
-            "kms:Decrypt"
+            'kms:GenerateDataKey*',
+            'kms:Decrypt',
           ],
-          Effect: "Allow",
+          Effect: 'Allow',
           Principal: {
-            Service: {
-              "Fn::Join": ["", ["s3.", { Ref: "AWS::URLSuffix" }]]
-            }
+            Service: 's3.amazonaws.com',
           },
-          Resource: "*"
-        }
+          Resource: '*',
+        },
       ],
-      Version: "2012-10-17"
+      Version: '2012-10-17',
     },
-    Description: "Created by Queue"
+    Description: 'Created by Queue',
   });
-});
-
-test('fails if trying to subscribe to a queue with managed kms encryption', () => {
-  const stack = new Stack();
-  const queue = new sqs.Queue(stack, 'Queue', { encryption: sqs.QueueEncryption.KmsManaged });
-  const bucket = new s3.Bucket(stack, 'Bucket');
-  expect(() => {
-    bucket.addObjectRemovedNotification(new notif.SqsDestination(queue));
-  }).toThrow('Unable to add statement to IAM resource policy for KMS key: "alias/aws/sqs"');
 });

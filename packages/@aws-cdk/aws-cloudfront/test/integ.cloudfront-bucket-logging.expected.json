@@ -1,13 +1,14 @@
 {
   "Resources": {
     "Bucket83908E77": {
-      "Type": "AWS::S3::Bucket"
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
     },
     "AnAmazingWebsiteProbablyCFDistribution47E3983B": {
       "Type": "AWS::CloudFront::Distribution",
       "Properties": {
         "DistributionConfig": {
-          "CacheBehaviors": [],
           "DefaultCacheBehavior": {
             "AllowedMethods": [
               "GET",
@@ -17,6 +18,7 @@
               "GET",
               "HEAD"
             ],
+            "Compress": true,
             "ForwardedValues": {
               "Cookies": {
                 "Forward": "none"
@@ -71,13 +73,13 @@
     },
     "AnAmazingWebsiteProbably2LoggingBucket222F7CE9": {
       "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Retain",
       "DeletionPolicy": "Retain"
     },
     "AnAmazingWebsiteProbably2CFDistribution7C1CCD12": {
       "Type": "AWS::CloudFront::Distribution",
       "Properties": {
         "DistributionConfig": {
-          "CacheBehaviors": [],
           "DefaultCacheBehavior": {
             "AllowedMethods": [
               "GET",
@@ -87,6 +89,7 @@
               "GET",
               "HEAD"
             ],
+            "Compress": true,
             "ForwardedValues": {
               "Cookies": {
                 "Forward": "none"

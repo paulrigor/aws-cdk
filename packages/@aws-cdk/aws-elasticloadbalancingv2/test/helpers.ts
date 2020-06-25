@@ -1,6 +1,6 @@
-import ec2 = require('@aws-cdk/aws-ec2');
-import cdk = require('@aws-cdk/cdk');
-import elbv2 = require('../lib');
+import * as ec2 from '@aws-cdk/aws-ec2';
+import * as cdk from '@aws-cdk/core';
+import * as elbv2 from '../lib';
 
 export class FakeSelfRegisteringTarget extends cdk.Construct implements elbv2.IApplicationLoadBalancerTarget, elbv2.INetworkLoadBalancerTarget,
     ec2.IConnectable {
@@ -11,16 +11,16 @@ export class FakeSelfRegisteringTarget extends cdk.Construct implements elbv2.IA
     super(scope, id);
     this.securityGroup = new ec2.SecurityGroup(this, 'SG', { vpc });
     this.connections = new ec2.Connections({
-      securityGroups: [this.securityGroup]
+      securityGroups: [this.securityGroup],
     });
   }
 
   public attachToApplicationTargetGroup(targetGroup: elbv2.ApplicationTargetGroup): elbv2.LoadBalancerTargetProps {
     targetGroup.registerConnectable(this);
-    return { targetType: elbv2.TargetType.Instance };
+    return { targetType: elbv2.TargetType.INSTANCE };
   }
 
   public attachToNetworkTargetGroup(_targetGroup: elbv2.NetworkTargetGroup): elbv2.LoadBalancerTargetProps {
-    return { targetType: elbv2.TargetType.Instance };
+    return { targetType: elbv2.TargetType.INSTANCE };
   }
 }

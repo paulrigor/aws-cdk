@@ -1,17 +1,17 @@
-import cfn = require('@aws-cdk/aws-cloudformation');
-import codepipeline = require('@aws-cdk/aws-codepipeline');
-import cpactions = require('@aws-cdk/aws-codepipeline-actions');
-import s3 = require('@aws-cdk/aws-s3');
-import cdk = require('@aws-cdk/cdk');
-import cicd = require('../lib');
+import * as cfn from '@aws-cdk/aws-cloudformation';
+import * as codepipeline from '@aws-cdk/aws-codepipeline';
+import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
+import * as s3 from '@aws-cdk/aws-s3';
+import * as cdk from '@aws-cdk/core';
+import * as cicd from '../lib';
 
 const app = new cdk.App();
 
 const stack = new cdk.Stack(app, 'CICD');
 const pipeline = new codepipeline.Pipeline(stack, 'CodePipeline', {
   artifactBucket: new s3.Bucket(stack, 'ArtifactBucket', {
-    removalPolicy: cdk.RemovalPolicy.Destroy
-  })
+    removalPolicy: cdk.RemovalPolicy.DESTROY,
+  }),
 });
 const sourceOutput = new codepipeline.Artifact('Artifact_CICDGitHubF8BA7ADD');
 const source = new cpactions.GitHubSourceAction({
@@ -19,23 +19,22 @@ const source = new cpactions.GitHubSourceAction({
   owner: 'awslabs',
   repo: 'aws-cdk',
   oauthToken: cdk.SecretValue.plainText('DummyToken'),
-  trigger: cpactions.GitHubTrigger.Poll,
+  trigger: cpactions.GitHubTrigger.POLL,
   output: sourceOutput,
 });
 pipeline.addStage({
-  name: 'Source',
+  stageName: 'Source',
   actions: [source],
 });
-const stage = pipeline.addStage({ name: 'Deploy' });
-new cicd.PipelineDeployStackAction(stack, 'DeployStack', {
-  stage,
+const stage = pipeline.addStage({ stageName: 'Deploy' });
+stage.addAction(new cicd.PipelineDeployStackAction({
   stack,
   changeSetName: 'CICD-ChangeSet',
   createChangeSetRunOrder: 10,
   executeChangeSetRunOrder: 999,
   input: sourceOutput,
   adminPermissions: false,
-  capabilities: cfn.CloudFormationCapabilities.None,
-});
+  capabilities: [cfn.CloudFormationCapabilities.NONE],
+}));
 
 app.synth();

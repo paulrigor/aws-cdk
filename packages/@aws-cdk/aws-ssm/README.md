@@ -1,18 +1,15 @@
 ## AWS Systems Manager Construct Library
 <!--BEGIN STABILITY BANNER-->
-
 ---
 
-![Stability: Experimental](https://img.shields.io/badge/stability-Experimental-important.svg?style=for-the-badge)
+![cfn-resources: Stable](https://img.shields.io/badge/cfn--resources-stable-success.svg?style=for-the-badge)
 
-> This API is still under active development and subject to non-backward
-> compatible changes or removal in any future version. Use of the API is not recommended in production
-> environments. Experimental APIs are not subject to the Semantic Versioning model.
+![cdk-constructs: Stable](https://img.shields.io/badge/cdk--constructs-stable-success.svg?style=for-the-badge)
 
 ---
 <!--END STABILITY BANNER-->
 
-This module is part of the [AWS Cloud Development Kit](https://github.com/awslabs/aws-cdk) project.
+This module is part of the [AWS Cloud Development Kit](https://github.com/aws/aws-cdk) project.
 
 ### Installation
 Install the module:
@@ -24,7 +21,7 @@ $ npm i @aws-cdk/aws-ssm
 Import it into your code:
 
 ```ts
-import ssm = require('@aws-cdk/aws-ssm');
+import * as ssm from '@aws-cdk/aws-ssm';
 ```
 
 ### Using existing SSM Parameters in your CDK app
@@ -41,6 +38,16 @@ a CDK app. These are public (not secret) values. Parameters of type
 *SecretString* cannot be created directly from a CDK application; if you want
 to provision secrets automatically, use Secrets Manager Secrets (see the
 `@aws-cdk/aws-secretsmanager` package).
+
+```ts
+new ssm.StringParameter(stack, 'Parameter', {
+  allowedPattern: '.*',
+  description: 'The value Foo',
+  parameterName: 'FooParameter',
+  stringValue: 'Foo',
+  tier: ssm.ParameterTier.ADVANCED,
+});
+```
 
 [creating SSM parameters](test/integ.parameter.lit.ts)
 

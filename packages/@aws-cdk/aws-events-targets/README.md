@@ -1,17 +1,29 @@
-# Event Targets for AWS CloudWatch Events
+# Event Targets for Amazon EventBridge
 <!--BEGIN STABILITY BANNER-->
-
 ---
 
-![Stability: Experimental](https://img.shields.io/badge/stability-Experimental-important.svg?style=for-the-badge)
-
-> This API is still under active development and subject to non-backward
-> compatible changes or removal in any future version. Use of the API is not recommended in production
-> environments. Experimental APIs are not subject to the Semantic Versioning model.
+![cdk-constructs: Stable](https://img.shields.io/badge/cdk--constructs-stable-success.svg?style=for-the-badge)
 
 ---
 <!--END STABILITY BANNER-->
 
-See the README of the `@aws-cdk/aws-events` library.
+This library contains integration classes to send Amazon EventBridge to any
+number of supported AWS Services. Instances of these classes should be passed
+to the `rule.addTarget()` method.
 
+Currently supported are:
+
+* Start a CodeBuild build
+* Start a CodePipeline pipeline
+* Run an ECS task
+* Invoke a Lambda function
+* Publish a message to an SNS topic
+* Send a message to an SQS queue
+* Start a StepFunctions state machine
+* Queue a Batch job
+* Make an AWS API call
+* Put a record to a Kinesis stream
+
+See the README of the `@aws-cdk/aws-events` library for more information on
+EventBridge.
 

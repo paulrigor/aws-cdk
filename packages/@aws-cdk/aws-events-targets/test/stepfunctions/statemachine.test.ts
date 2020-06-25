@@ -1,17 +1,17 @@
 import '@aws-cdk/assert/jest';
-import events = require('@aws-cdk/aws-events');
-import sfn = require('@aws-cdk/aws-stepfunctions');
-import cdk = require('@aws-cdk/cdk');
-import targets = require('../../lib');
+import * as events from '@aws-cdk/aws-events';
+import * as sfn from '@aws-cdk/aws-stepfunctions';
+import * as cdk from '@aws-cdk/core';
+import * as targets from '../../lib';
 
 test('State machine can be used as Event Rule target', () => {
   // GIVEN
   const stack = new cdk.Stack();
   const rule = new events.Rule(stack, 'Rule', {
-    scheduleExpression: 'rate(1 minute)'
+    schedule: events.Schedule.rate(cdk.Duration.minutes(1)),
   });
   const stateMachine = new sfn.StateMachine(stack, 'SM', {
-    definition: new sfn.Wait(stack, 'Hello', { duration: sfn.WaitDuration.seconds(10) })
+    definition: new sfn.Wait(stack, 'Hello', { time: sfn.WaitTime.duration(cdk.Duration.seconds(10)) }),
   });
 
   // WHEN
@@ -23,8 +23,8 @@ test('State machine can be used as Event Rule target', () => {
   expect(stack).toHaveResourceLike('AWS::Events::Rule', {
     Targets: [
       {
-        Input: "{\"SomeParam\":\"SomeValue\"}"
-      }
-    ]
+        Input: '{"SomeParam":"SomeValue"}',
+      },
+    ],
   });
 });

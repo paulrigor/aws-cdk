@@ -1,18 +1,19 @@
 ## AWS Config Construct Library
 <!--BEGIN STABILITY BANNER-->
-
 ---
 
-![Stability: Experimental](https://img.shields.io/badge/stability-Experimental-important.svg?style=for-the-badge)
+![cfn-resources: Stable](https://img.shields.io/badge/cfn--resources-stable-success.svg?style=for-the-badge)
 
-> This API is still under active development and subject to non-backward
-> compatible changes or removal in any future version. Use of the API is not recommended in production
-> environments. Experimental APIs are not subject to the Semantic Versioning model.
+> All classes with the `Cfn` prefix in this module ([CFN Resources](https://docs.aws.amazon.com/cdk/latest/guide/constructs.html#constructs_lib)) are always stable and safe to use.
+
+![cdk-constructs: Developer Preview](https://img.shields.io/badge/cdk--constructs-developer--preview-informational.svg?style=for-the-badge)
+
+> The APIs of higher level constructs in this module are in **developer preview** before they become stable. We will only make breaking changes to address unforeseen API issues. Therefore, these APIs are not subject to [Semantic Versioning](https://semver.org/), and breaking changes will be announced in release notes. This means that while you may use them, you may need to update your source code when upgrading to a newer version of this package.
 
 ---
 <!--END STABILITY BANNER-->
 
-This module is part of the [AWS Cloud Development Kit](https://github.com/awslabs/aws-cdk) project.
+This module is part of the [AWS Cloud Development Kit](https://github.com/aws/aws-cdk) project.
 
 Supported:
 * Config rules
@@ -21,6 +22,19 @@ Not supported
 * Configuration recoder
 * Delivery channel
 * Aggregation
+
+### Initial Setup
+
+Before using the constructs provided in this module, you need to setup 
+AWS Config in the region you plan on using it in. This setup includes:
+
+- `ConfigurationRecorder`: Configure which resources will be recorded for config changes.
+- `DeliveryChannel`: Configure where to store the recorded data.
+
+Following are the guides to setup AWS Config:
+
+- [Using the AWS Console](https://docs.aws.amazon.com/config/latest/developerguide/gs-console.html)
+- [Using the AWS CLI](https://docs.aws.amazon.com/config/latest/developerguide/gs-cli.html)
 
 ### Rules
 
@@ -36,7 +50,7 @@ new ManagedRule(this, 'AccessKeysRotated', {
 Available identifiers and parameters are listed in the [List of AWS Config Managed Rules](https://docs.aws.amazon.com/config/latest/developerguide/managed-rules-by-aws-config.html).
 
 
-Higher level constructs for managed rules are available, see [Managed Rules](https://github.com/awslabs/aws-cdk/blob/master/packages/%40aws-cdk/aws-config/lib/managed-rules.ts). Prefer to use those constructs when available (PRs welcome to add more of those).
+Higher level constructs for managed rules are available, see [Managed Rules](https://github.com/aws/aws-cdk/blob/master/packages/%40aws-cdk/aws-config/lib/managed-rules.ts). Prefer to use those constructs when available (PRs welcome to add more of those).
 
 #### Custom rules
 To set up a custom rule, define a `CustomRule` and specify the Lambda Function to run and the trigger types:

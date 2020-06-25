@@ -1,7 +1,8 @@
 import { expect, haveResourceLike } from '@aws-cdk/assert';
-import cdk = require('@aws-cdk/cdk');
+import * as cdk from '@aws-cdk/core';
 import { Test } from 'nodeunit';
-import codepipeline = require('../lib');
+import * as codepipeline from '../lib';
+import { Stage } from '../lib/stage';
 
 // tslint:disable:object-literal-key-quotes
 
@@ -11,18 +12,18 @@ export = {
       const stack = new cdk.Stack();
       const pipeline = new codepipeline.Pipeline(stack, 'Pipeline');
 
-      const secondStage = pipeline.addStage({ name: 'SecondStage' });
+      const secondStage = pipeline.addStage({ stageName: 'SecondStage' });
       pipeline.addStage({
-        name: 'FirstStage',
+        stageName: 'FirstStage',
         placement: {
           rightBefore: secondStage,
         },
       });
 
       expect(stack, true).to(haveResourceLike('AWS::CodePipeline::Pipeline', {
-        "Stages": [
-          { "Name": "FirstStage" },
-          { "Name": "SecondStage" },
+        'Stages': [
+          { 'Name': 'FirstStage' },
+          { 'Name': 'SecondStage' },
         ],
       }));
 
@@ -33,20 +34,20 @@ export = {
       const stack = new cdk.Stack();
       const pipeline = new codepipeline.Pipeline(stack, 'Pipeline');
 
-      const firstStage = pipeline.addStage({ name: 'FirstStage' });
-      pipeline.addStage({ name: 'ThirdStage' });
+      const firstStage = pipeline.addStage({ stageName: 'FirstStage' });
+      pipeline.addStage({ stageName: 'ThirdStage' });
       pipeline.addStage({
-        name: 'SecondStage',
+        stageName: 'SecondStage',
         placement: {
           justAfter: firstStage,
         },
       });
 
       expect(stack, true).to(haveResourceLike('AWS::CodePipeline::Pipeline', {
-        "Stages": [
-          { "Name": "FirstStage" },
-          { "Name": "SecondStage" },
-          { "Name": "ThirdStage" },
+        'Stages': [
+          { 'Name': 'FirstStage' },
+          { 'Name': 'SecondStage' },
+          { 'Name': 'ThirdStage' },
         ],
       }));
 
@@ -56,12 +57,12 @@ export = {
     "attempting to insert a Stage before a Stage that doesn't exist results in an error"(test: Test) {
       const stack = new cdk.Stack();
       const pipeline = new codepipeline.Pipeline(stack, 'Pipeline');
-      const stage = pipeline.addStage({ name: 'Stage' });
+      const stage = pipeline.addStage({ stageName: 'Stage' });
 
       const anotherPipeline = new codepipeline.Pipeline(stack, 'AnotherPipeline');
       test.throws(() => {
         anotherPipeline.addStage({
-          name: 'AnotherStage',
+          stageName: 'AnotherStage',
           placement: {
             rightBefore: stage,
           },
@@ -74,12 +75,12 @@ export = {
     "attempting to insert a Stage after a Stage that doesn't exist results in an error"(test: Test) {
       const stack = new cdk.Stack();
       const pipeline = new codepipeline.Pipeline(stack, 'Pipeline');
-      const stage = pipeline.addStage({ name: 'Stage' });
+      const stage = pipeline.addStage({ stageName: 'Stage' });
 
       const anotherPipeline = new codepipeline.Pipeline(stack, 'AnotherPipeline');
       test.throws(() => {
         anotherPipeline.addStage({
-          name: 'AnotherStage',
+          stageName: 'AnotherStage',
           placement: {
             justAfter: stage,
           },
@@ -89,14 +90,14 @@ export = {
       test.done();
     },
 
-    "providing more than one placement value results in an error"(test: Test) {
+    'providing more than one placement value results in an error'(test: Test) {
       const stack = new cdk.Stack();
       const pipeline = new codepipeline.Pipeline(stack, 'Pipeline');
-      const stage = pipeline.addStage({ name: 'Stage' });
+      const stage = pipeline.addStage({ stageName: 'Stage' });
 
       test.throws(() => {
         pipeline.addStage({
-          name: 'SecondStage',
+          stageName: 'SecondStage',
           placement: {
             rightBefore: stage,
             justAfter: stage,
@@ -108,6 +109,31 @@ export = {
       }, function(e: any) {
         return /rightBefore/.test(e) && /justAfter/.test(e);
       });
+
+      test.done();
+    },
+
+    'can be retrieved from a pipeline after it has been created'(test: Test) {
+      const stack = new cdk.Stack();
+      const pipeline = new codepipeline.Pipeline(stack, 'Pipeline', {
+        stages: [
+          {
+            stageName: 'FirstStage',
+          },
+        ],
+      });
+
+      pipeline.addStage({ stageName: 'SecondStage' });
+
+      test.equal(pipeline.stages.length, 2);
+      test.equal(pipeline.stages[0].stageName, 'FirstStage');
+      test.equal(pipeline.stages[1].stageName, 'SecondStage');
+
+      // adding stages to the returned array should have no effect
+      pipeline.stages.push(new Stage({
+        stageName: 'ThirdStage',
+      }, pipeline));
+      test.equal(pipeline.stageCount, 2);
 
       test.done();
     },

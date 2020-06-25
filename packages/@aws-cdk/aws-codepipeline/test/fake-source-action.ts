@@ -1,23 +1,45 @@
-import codepipeline = require('../lib');
+import * as events from '@aws-cdk/aws-events';
+import { Construct, Lazy } from '@aws-cdk/core';
+import * as codepipeline from '../lib';
 
-export interface FakeSourceActionProps extends codepipeline.CommonActionProps {
-  output: codepipeline.Artifact;
-
-  extraOutputs?: codepipeline.Artifact[];
+export interface IFakeSourceActionVariables {
+  readonly firstVariable: string;
 }
 
-export class FakeSourceAction extends codepipeline.Action {
+export interface FakeSourceActionProps extends codepipeline.CommonActionProps {
+  readonly output: codepipeline.Artifact;
+
+  readonly extraOutputs?: codepipeline.Artifact[];
+
+  readonly region?: string;
+}
+
+export class FakeSourceAction implements codepipeline.IAction {
+  public readonly inputs?: codepipeline.Artifact[];
+  public readonly outputs?: codepipeline.Artifact[];
+  public readonly variables: IFakeSourceActionVariables;
+
+  public readonly actionProperties: codepipeline.ActionProperties;
+
   constructor(props: FakeSourceActionProps) {
-    super({
+    this.actionProperties = {
       ...props,
-      category: codepipeline.ActionCategory.Source,
+      category: codepipeline.ActionCategory.SOURCE,
       provider: 'Fake',
       artifactBounds: { minInputs: 0, maxInputs: 0, minOutputs: 1, maxOutputs: 4 },
       outputs: [props.output, ...props.extraOutputs || []],
-    });
+    };
+    this.variables = {
+      firstVariable: Lazy.stringValue({ produce: () => `#{${this.actionProperties.variablesNamespace}.FirstVariable}` }),
+    };
   }
 
-  protected bind(_info: codepipeline.ActionBind): void {
-    // do nothing
+  public bind(_scope: Construct, _stage: codepipeline.IStage, _options: codepipeline.ActionBindOptions):
+  codepipeline.ActionConfig {
+    return {};
+  }
+
+  public onStateChange(_name: string, _target?: events.IRuleTarget, _options?: events.RuleProps): events.Rule {
+    throw new Error('onStateChange() is not available on FakeSourceAction');
   }
 }

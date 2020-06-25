@@ -1,7 +1,9 @@
 {
   "Resources": {
     "CacheBucket41D9D0B0": {
-      "Type": "AWS::S3::Bucket"
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
     },
     "MyProjectRole9BBE5233": {
       "Type": "AWS::IAM::Role",
@@ -12,17 +14,7 @@
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": {
-                "Service": {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "codebuild.",
-                      {
-                        "Ref": "AWS::URLSuffix"
-                      }
-                    ]
-                  ]
-                }
+                "Service": "codebuild.amazonaws.com"
               }
             }
           ],

@@ -1,20 +1,17 @@
 ## Continuous Integration / Continuous Delivery for CDK Applications
 <!--BEGIN STABILITY BANNER-->
-
 ---
 
-![Stability: Experimental](https://img.shields.io/badge/stability-Experimental-important.svg?style=for-the-badge)
+![cdk-constructs: Experimental](https://img.shields.io/badge/cdk--constructs-experimental-important.svg?style=for-the-badge)
 
-> This API is still under active development and subject to non-backward
-> compatible changes or removal in any future version. Use of the API is not recommended in production
-> environments. Experimental APIs are not subject to the Semantic Versioning model.
+> The APIs of higher level constructs in this module are experimental and under active development. They are subject to non-backward compatible changes or removal in any future version. These are not subject to the [Semantic Versioning](https://semver.org/) model and breaking changes will be announced in the release notes. This means that while you may use them, you may need to update your source code when upgrading to a newer version of this package.
 
 ---
 <!--END STABILITY BANNER-->
 
 This library includes a *CodePipeline* composite Action for deploying AWS CDK Applications.
 
-This module is part of the [AWS Cloud Development Kit](https://github.com/awslabs/aws-cdk) project.
+This module is part of the [AWS Cloud Development Kit](https://github.com/aws/aws-cdk) project.
 
 ### Limitations
 The construct library in it's current form has the following limitations:
@@ -44,11 +41,11 @@ The example below defines a *CDK App* that contains 3 stacks:
 #### `index.ts`
 
 ```typescript
-import codebuild = require('@aws-cdk/aws-codebuild');
-import codepipeline = require('@aws-cdk/aws-codepipeline');
-import codepipeline_actions = require('@aws-cdk/aws-codepipeline-actions');
-import cdk = require('@aws-cdk/cdk');
-import cicd = require('@aws-cdk/cicd');
+import * as codebuild from '@aws-cdk/aws-codebuild';
+import * as codepipeline from '@aws-cdk/aws-codepipeline';
+import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
+import * as cdk from '@aws-cdk/core';
+import * as cicd from '@aws-cdk/app-delivery';
 
 const app = new cdk.App();
 
@@ -70,12 +67,12 @@ const source = new codepipeline_actions.GitHubSourceAction({
   /* ... */
 });
 pipeline.addStage({
-  name: 'source',
+  stageName: 'source',
   actions: [source],
 });
 
 const project = new codebuild.PipelineProject(pipelineStack, 'CodeBuild', {
-  /** 
+  /**
   * Choose an environment configuration that meets your use case.
   * For NodeJS, this might be:
   *
@@ -89,51 +86,49 @@ const buildAction = new codepipeline_actions.CodeBuildAction({
   actionName: 'CodeBuild',
   project,
   input: sourceOutput,
-  output: synthesizedApp,
+  outputs: [synthesizedApp],
 });
 pipeline.addStage({
-  name: 'build',
+  stageName: 'build',
   actions: [buildAction],
 });
 
 // Optionally, self-update the pipeline stack
-const selfUpdateStage = pipeline.addStage({ name: 'SelfUpdate' });
-new cicd.PipelineDeployStackAction(pipelineStack, 'SelfUpdatePipeline', {
-  stage: selfUpdateStage,
+const selfUpdateStage = pipeline.addStage({ stageName: 'SelfUpdate' });
+selfUpdateStage.addAction(new cicd.PipelineDeployStackAction({
   stack: pipelineStack,
   input: synthesizedApp,
-});
+  adminPermissions: true,
+}));
 
 // Now add our service stacks
-const deployStage = pipeline.addStage({ name: 'Deploy' });
+const deployStage = pipeline.addStage({ stageName: 'Deploy' });
 const serviceStackA = new MyServiceStackA(app, 'ServiceStackA', { /* ... */ });
 // Add actions to deploy the stacks in the deploy stage:
-const deployServiceAAction = new cicd.PipelineDeployStackAction(pipelineStack, 'DeployServiceStackA', {
-  stage: deployStage,
+const deployServiceAAction = new cicd.PipelineDeployStackAction({
   stack: serviceStackA,
   input: synthesizedApp,
   // See the note below for details about this option.
-  adminPermissions: false, 
+  adminPermissions: false,
 });
+deployStage.addAction(deployServiceAAction);
 // Add the necessary permissions for you service deploy action. This role is
 // is passed to CloudFormation and needs the permissions necessary to deploy
-// stack. Alternatively you can enable [Administrator](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_job-functions.html#jf_administrator) permissions above, 
+// stack. Alternatively you can enable [Administrator](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_job-functions.html#jf_administrator) permissions above,
 // users should understand the privileged nature of this role.
-deployServiceAAction.addToRolePolicy(
-  new iam.PolicyStatement()
-    .addAction('service:SomeAction')
-    .addResource(myResource.myResourceArn)
+deployServiceAAction.addToRolePolicy(new iam.PolicyStatement({
+    actions: ['service:SomeAction'],
+    resources: [myResource.myResourceArn],
     // add more Action(s) and/or Resource(s) here, as needed
-);
+}));
 
 const serviceStackB = new MyServiceStackB(app, 'ServiceStackB', { /* ... */ });
-new cicd.PipelineDeployStackAction(pipelineStack, 'DeployServiceStackB', {
-  stage: deployStage,
+deployStage.addAction(new cicd.PipelineDeployStackAction({
   stack: serviceStackB,
   input: synthesizedApp,
   createChangeSetRunOrder: 998,
   adminPermissions: true, // no need to modify the role with admin
-}); 
+}));
 ```
 
 #### `buildspec.yml`
@@ -164,7 +159,7 @@ artifacts:
   files: '**/*'
 ```
 
-The `PipelineDeployStackAction` expects it's `input` to contain the result of 
+The `PipelineDeployStackAction` expects it's `input` to contain the result of
 synthesizing a CDK App using the `cdk synth -o <directory>`.
 
 

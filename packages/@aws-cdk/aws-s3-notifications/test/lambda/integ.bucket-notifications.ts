@@ -1,28 +1,28 @@
-import lambda = require('@aws-cdk/aws-lambda');
-import s3 = require('@aws-cdk/aws-s3');
-import cdk = require('@aws-cdk/cdk');
-import s3n = require('../../lib');
+import * as lambda from '@aws-cdk/aws-lambda';
+import * as s3 from '@aws-cdk/aws-s3';
+import * as cdk from '@aws-cdk/core';
+import * as s3n from '../../lib';
 
 const app = new cdk.App();
 
 const stack = new cdk.Stack(app, 'lambda-bucket-notifications');
 
 const bucketA = new s3.Bucket(stack, 'MyBucket', {
-  removalPolicy: cdk.RemovalPolicy.Destroy
+  removalPolicy: cdk.RemovalPolicy.DESTROY,
 });
 
 const fn = new lambda.Function(stack, 'MyFunction', {
-  runtime: lambda.Runtime.NodeJS810,
+  runtime: lambda.Runtime.NODEJS_10_X,
   handler: 'index.handler',
-  code: lambda.Code.inline(`exports.handler = ${handler.toString()}`)
+  code: lambda.Code.fromInline(`exports.handler = ${handler.toString()}`),
 });
 
 const bucketB = new s3.Bucket(stack, 'YourBucket', {
-  removalPolicy: cdk.RemovalPolicy.Destroy
+  removalPolicy: cdk.RemovalPolicy.DESTROY,
 });
 
 bucketA.addObjectCreatedNotification(new s3n.LambdaDestination(fn), { suffix: '.png' });
-bucketB.addEventNotification(s3.EventType.ObjectRemoved, new s3n.LambdaDestination(fn));
+bucketB.addEventNotification(s3.EventType.OBJECT_REMOVED, new s3n.LambdaDestination(fn));
 
 app.synth();
 

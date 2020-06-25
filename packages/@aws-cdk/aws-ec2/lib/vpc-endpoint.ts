@@ -1,10 +1,13 @@
-import iam = require('@aws-cdk/aws-iam');
-import { Aws, Construct, IResource, Resource, Token } from '@aws-cdk/cdk';
+import * as iam from '@aws-cdk/aws-iam';
+import * as cxschema from '@aws-cdk/cloud-assembly-schema';
+import { Aws, Construct, ContextProvider, IResource, Lazy, Resource, Token } from '@aws-cdk/core';
 import { Connections, IConnectable } from './connections';
 import { CfnVPCEndpoint } from './ec2.generated';
-import { SecurityGroup } from './security-group';
-import { TcpPort } from './security-group-rule';
-import { IVpc, SubnetSelection, SubnetType } from './vpc';
+import { Peer } from './peer';
+import { Port } from './port';
+import { ISecurityGroup, SecurityGroup } from './security-group';
+import { allRouteTableIds, flatten } from './util';
+import { ISubnet, IVpc, SubnetSelection } from './vpc';
 
 /**
  * A VPC endpoint.
@@ -40,7 +43,7 @@ export abstract class VpcEndpoint extends Resource implements IVpcEndpoint {
       this.policyDocument = new iam.PolicyDocument();
     }
 
-    this.policyDocument.addStatement(statement);
+    this.policyDocument.addStatements(statement);
   }
 }
 
@@ -61,7 +64,7 @@ export enum VpcEndpointType {
    * address that serves as an entry point for traffic destined to a supported
    * service.
    */
-  Interface = 'Interface',
+  INTERFACE = 'Interface',
 
   /**
    * Gateway
@@ -69,7 +72,7 @@ export enum VpcEndpointType {
    * A gateway endpoint is a gateway that is a target for a specified route in
    * your route table, used for traffic destined to a supported AWS service.
    */
-  Gateway = 'Gateway'
+  GATEWAY = 'Gateway'
 }
 
 /**
@@ -86,7 +89,7 @@ export interface IGatewayVpcEndpointService {
  * An AWS service for a gateway VPC endpoint.
  */
 export class GatewayVpcEndpointAwsService implements IGatewayVpcEndpointService {
-  public static readonly DynamoDb = new GatewayVpcEndpointAwsService('dynamodb');
+  public static readonly DYNAMODB = new GatewayVpcEndpointAwsService('dynamodb');
   public static readonly S3 = new GatewayVpcEndpointAwsService('s3');
 
   /**
@@ -95,7 +98,7 @@ export class GatewayVpcEndpointAwsService implements IGatewayVpcEndpointService 
   public readonly name: string;
 
   constructor(name: string, prefix?: string) {
-    this.name = `${prefix || 'com.amazonaws'}.${Aws.region}.${name}`;
+    this.name = `${prefix || 'com.amazonaws'}.${Aws.REGION}.${name}`;
   }
 }
 
@@ -111,7 +114,21 @@ export interface GatewayVpcEndpointOptions {
   /**
    * Where to add endpoint routing.
    *
-   * @default private subnets
+   * By default, this endpoint will be routable from all subnets in the VPC.
+   * Specify a list of subnet selection objects here to be more specific.
+   *
+   * @default - All subnets in the VPC
+   * @example
+   *
+   * vpc.addGatewayEndpoint('DynamoDbEndpoint', {
+   *   service: ec2.GatewayVpcEndpointAwsService.DYNAMODB,
+   *   // Add only to ISOLATED subnets
+   *   subnets: [
+   *     { subnetType: ec2.SubnetType.ISOLATED }
+   *   ]
+   * });
+   *
+   *
    */
   readonly subnets?: SubnetSelection[]
 }
@@ -164,25 +181,27 @@ export class GatewayVpcEndpoint extends VpcEndpoint implements IGatewayVpcEndpoi
   constructor(scope: Construct, id: string, props: GatewayVpcEndpointProps) {
     super(scope, id);
 
-    const subnets = props.subnets || [{ subnetType: SubnetType.Private }];
-    const routeTableIds = [...new Set(Array().concat(...subnets.map(s => props.vpc.selectSubnets(s).routeTableIds)))];
+    const subnets: ISubnet[] = props.subnets
+      ? flatten(props.subnets.map(s => props.vpc.selectSubnets(s).subnets))
+      : [...props.vpc.privateSubnets, ...props.vpc.publicSubnets, ...props.vpc.isolatedSubnets];
+    const routeTableIds = allRouteTableIds(subnets);
 
     if (routeTableIds.length === 0) {
-      throw new Error(`Can't add a gateway endpoint to VPC; route table IDs are not available`);
+      throw new Error('Can\'t add a gateway endpoint to VPC; route table IDs are not available');
     }
 
     const endpoint = new CfnVPCEndpoint(this, 'Resource', {
-      policyDocument: new Token(() => this.policyDocument),
+      policyDocument: Lazy.anyValue({ produce: () => this.policyDocument }),
       routeTableIds,
       serviceName: props.service.name,
-      vpcEndpointType: VpcEndpointType.Gateway,
-      vpcId: props.vpc.vpcId
+      vpcEndpointType: VpcEndpointType.GATEWAY,
+      vpcId: props.vpc.vpcId,
     });
 
-    this.vpcEndpointId = endpoint.vpcEndpointId;
-    this.vpcEndpointCreationTimestamp = endpoint.vpcEndpointCreationTimestamp;
-    this.vpcEndpointDnsEntries = endpoint.vpcEndpointDnsEntries;
-    this.vpcEndpointNetworkInterfaceIds = endpoint.vpcEndpointNetworkInterfaceIds;
+    this.vpcEndpointId = endpoint.ref;
+    this.vpcEndpointCreationTimestamp = endpoint.attrCreationTimestamp;
+    this.vpcEndpointDnsEntries = endpoint.attrDnsEntries;
+    this.vpcEndpointNetworkInterfaceIds = endpoint.attrNetworkInterfaceIds;
   }
 }
 
@@ -199,49 +218,17 @@ export interface IInterfaceVpcEndpointService {
    * The port of the service.
    */
   readonly port: number;
+
+  /**
+   * Whether Private DNS is supported by default.
+   */
+  readonly privateDnsDefault?: boolean;
 }
 
 /**
- * An AWS service for an interface VPC endpoint.
+ * A custom-hosted service for an interface VPC endpoint.
  */
-export class InterfaceVpcEndpointAwsService implements IInterfaceVpcEndpointService {
-  public static readonly SageMakerNotebook = new InterfaceVpcEndpointAwsService('notebook', 'aws.sagemaker');
-  public static readonly CloudFormation = new InterfaceVpcEndpointAwsService('cloudformation');
-  public static readonly CloudTrail = new InterfaceVpcEndpointAwsService('cloudtrail');
-  public static readonly CodeBuild = new InterfaceVpcEndpointAwsService('codebuild');
-  public static readonly CodeBuildFips = new InterfaceVpcEndpointAwsService('codebuil-fips');
-  public static readonly CodeCommit = new InterfaceVpcEndpointAwsService('codecommit');
-  public static readonly CodeCommitFips = new InterfaceVpcEndpointAwsService('codecommit-fips');
-  public static readonly CodePipeline = new InterfaceVpcEndpointAwsService('codepipeline');
-  public static readonly Config = new InterfaceVpcEndpointAwsService('config');
-  public static readonly Ec2 = new InterfaceVpcEndpointAwsService('ec2');
-  public static readonly Ec2Messages = new InterfaceVpcEndpointAwsService('ec2messages');
-  public static readonly Ecr = new InterfaceVpcEndpointAwsService('ecr.api');
-  public static readonly EcrDocker = new InterfaceVpcEndpointAwsService('ecr.dkr');
-  public static readonly Ecs = new InterfaceVpcEndpointAwsService('ecs');
-  public static readonly EcsAgent = new InterfaceVpcEndpointAwsService('ecs-agent');
-  public static readonly EcsTelemetry = new InterfaceVpcEndpointAwsService('ecs-telemetry');
-  public static readonly ElasticInferenceRuntime = new InterfaceVpcEndpointAwsService('elastic-inference.runtime');
-  public static readonly ElasticLoadBalancing = new InterfaceVpcEndpointAwsService('elasticloadbalancing');
-  public static readonly CloudWatchEvents = new InterfaceVpcEndpointAwsService('events');
-  public static readonly ApiGateway = new InterfaceVpcEndpointAwsService('execute-api');
-  public static readonly CodeCommitGit = new InterfaceVpcEndpointAwsService('git-codecommit');
-  public static readonly CodeCommitGitFips = new InterfaceVpcEndpointAwsService('git-codecommit-fips');
-  public static readonly KinesisStreams = new InterfaceVpcEndpointAwsService('kinesis-streams');
-  public static readonly Kms = new InterfaceVpcEndpointAwsService('kms');
-  public static readonly CloudWatchLogs = new InterfaceVpcEndpointAwsService('logs');
-  public static readonly CloudWatch = new InterfaceVpcEndpointAwsService('monitoring');
-  public static readonly SageMakerApi = new InterfaceVpcEndpointAwsService('sagemaker.api');
-  public static readonly SageMakerRuntime = new InterfaceVpcEndpointAwsService('sagemaker.runtime');
-  public static readonly SageMakerRuntimeFips = new InterfaceVpcEndpointAwsService('sagemaker.runtime-fips');
-  public static readonly SecretsManager = new InterfaceVpcEndpointAwsService('secretsmanager');
-  public static readonly ServiceCatalog = new InterfaceVpcEndpointAwsService('servicecatalog');
-  public static readonly Sns = new InterfaceVpcEndpointAwsService('sns');
-  public static readonly Sqs = new InterfaceVpcEndpointAwsService('sqs');
-  public static readonly Ssm = new InterfaceVpcEndpointAwsService('ssm');
-  public static readonly SsmMessages = new InterfaceVpcEndpointAwsService('ssmmessages');
-  public static readonly Sts = new InterfaceVpcEndpointAwsService('sts');
-  public static readonly Transfer = new InterfaceVpcEndpointAwsService('transfer.server');
+export class InterfaceVpcEndpointService implements IInterfaceVpcEndpointService {
 
   /**
    * The name of the service.
@@ -253,8 +240,82 @@ export class InterfaceVpcEndpointAwsService implements IInterfaceVpcEndpointServ
    */
   public readonly port: number;
 
+  /**
+   * Whether Private DNS is supported by default.
+   */
+  public readonly privateDnsDefault?: boolean = false;
+
+  constructor(name: string, port?: number) {
+    this.name = name;
+    this.port = port || 443;
+  }
+}
+
+/**
+ * An AWS service for an interface VPC endpoint.
+ */
+export class InterfaceVpcEndpointAwsService implements IInterfaceVpcEndpointService {
+  public static readonly SAGEMAKER_NOTEBOOK = new InterfaceVpcEndpointAwsService('notebook', 'aws.sagemaker');
+  public static readonly CLOUDFORMATION = new InterfaceVpcEndpointAwsService('cloudformation');
+  public static readonly CLOUDTRAIL = new InterfaceVpcEndpointAwsService('cloudtrail');
+  public static readonly CODEBUILD = new InterfaceVpcEndpointAwsService('codebuild');
+  public static readonly CODEBUILD_FIPS = new InterfaceVpcEndpointAwsService('codebuild-fips');
+  public static readonly CODECOMMIT = new InterfaceVpcEndpointAwsService('codecommit');
+  public static readonly CODECOMMIT_FIPS = new InterfaceVpcEndpointAwsService('codecommit-fips');
+  public static readonly CODEPIPELINE = new InterfaceVpcEndpointAwsService('codepipeline');
+  public static readonly CONFIG = new InterfaceVpcEndpointAwsService('config');
+  public static readonly EC2 = new InterfaceVpcEndpointAwsService('ec2');
+  public static readonly EC2_MESSAGES = new InterfaceVpcEndpointAwsService('ec2messages');
+  public static readonly ECR = new InterfaceVpcEndpointAwsService('ecr.api');
+  public static readonly ECR_DOCKER = new InterfaceVpcEndpointAwsService('ecr.dkr');
+  public static readonly ECS = new InterfaceVpcEndpointAwsService('ecs');
+  public static readonly ECS_AGENT = new InterfaceVpcEndpointAwsService('ecs-agent');
+  public static readonly ECS_TELEMETRY = new InterfaceVpcEndpointAwsService('ecs-telemetry');
+  public static readonly ELASTIC_FILESYSTEM = new InterfaceVpcEndpointAwsService('elasticfilesystem');
+  public static readonly ELASTIC_FILESYSTEM_FIPS = new InterfaceVpcEndpointAwsService('elasticfilesystem-fips');
+  public static readonly ELASTIC_INFERENCE_RUNTIME = new InterfaceVpcEndpointAwsService('elastic-inference.runtime');
+  public static readonly ELASTIC_LOAD_BALANCING = new InterfaceVpcEndpointAwsService('elasticloadbalancing');
+  public static readonly CLOUDWATCH_EVENTS = new InterfaceVpcEndpointAwsService('events');
+  public static readonly APIGATEWAY = new InterfaceVpcEndpointAwsService('execute-api');
+  public static readonly CODECOMMIT_GIT = new InterfaceVpcEndpointAwsService('git-codecommit');
+  public static readonly CODECOMMIT_GIT_FIPS = new InterfaceVpcEndpointAwsService('git-codecommit-fips');
+  public static readonly KINESIS_STREAMS = new InterfaceVpcEndpointAwsService('kinesis-streams');
+  public static readonly KMS = new InterfaceVpcEndpointAwsService('kms');
+  public static readonly CLOUDWATCH_LOGS = new InterfaceVpcEndpointAwsService('logs');
+  public static readonly CLOUDWATCH = new InterfaceVpcEndpointAwsService('monitoring');
+  public static readonly SAGEMAKER_API = new InterfaceVpcEndpointAwsService('sagemaker.api');
+  public static readonly SAGEMAKER_RUNTIME = new InterfaceVpcEndpointAwsService('sagemaker.runtime');
+  public static readonly SAGEMAKER_RUNTIME_FIPS = new InterfaceVpcEndpointAwsService('sagemaker.runtime-fips');
+  public static readonly SECRETS_MANAGER = new InterfaceVpcEndpointAwsService('secretsmanager');
+  public static readonly SERVICE_CATALOG = new InterfaceVpcEndpointAwsService('servicecatalog');
+  public static readonly SNS = new InterfaceVpcEndpointAwsService('sns');
+  public static readonly SQS = new InterfaceVpcEndpointAwsService('sqs');
+  public static readonly SSM = new InterfaceVpcEndpointAwsService('ssm');
+  public static readonly SSM_MESSAGES = new InterfaceVpcEndpointAwsService('ssmmessages');
+  public static readonly STS = new InterfaceVpcEndpointAwsService('sts');
+  public static readonly TRANSFER = new InterfaceVpcEndpointAwsService('transfer.server');
+  public static readonly STORAGE_GATEWAY = new InterfaceVpcEndpointAwsService('storagegateway');
+  public static readonly REKOGNITION = new InterfaceVpcEndpointAwsService('rekognition');
+  public static readonly REKOGNITION_FIPS = new InterfaceVpcEndpointAwsService('rekognition-fips');
+  public static readonly STEP_FUNCTIONS = new InterfaceVpcEndpointAwsService('states');
+
+  /**
+   * The name of the service.
+   */
+  public readonly name: string;
+
+  /**
+   * The port of the service.
+   */
+  public readonly port: number;
+
+  /**
+   * Whether Private DNS is supported by default.
+   */
+  public readonly privateDnsDefault?: boolean = true;
+
   constructor(name: string, prefix?: string, port?: number) {
-    this.name = `${prefix || 'com.amazonaws'}.${Aws.region}.${name}`;
+    this.name = `${prefix || 'com.amazonaws'}.${Aws.REGION}.${name}`;
     this.port = port || 443;
   }
 }
@@ -272,7 +333,8 @@ export interface InterfaceVpcEndpointOptions {
    * Whether to associate a private hosted zone with the specified VPC. This
    * allows you to make requests to the service using its default DNS hostname.
    *
-   * @default true
+   * @default set by the instance of IInterfaceVpcEndpointService, or true if
+   * not defined by the instance of IInterfaceVpcEndpointService
    */
   readonly privateDnsEnabled?: boolean;
 
@@ -280,9 +342,36 @@ export interface InterfaceVpcEndpointOptions {
    * The subnets in which to create an endpoint network interface. At most one
    * per availability zone.
    *
-   * @default private subnets
+   * @default - private subnets
    */
   readonly subnets?: SubnetSelection;
+
+  /**
+   * The security groups to associate with this interface VPC endpoint.
+   *
+   * @default - a new security group is created
+   */
+  readonly securityGroups?: ISecurityGroup[];
+
+  /**
+   * Whether to automatically allow VPC traffic to the endpoint
+   *
+   * If enabled, all traffic to the endpoint from within the VPC will be
+   * automatically allowed. This is done based on the VPC's CIDR range.
+   *
+   * @default true
+   */
+  readonly open?: boolean;
+
+  /**
+   * Limit to only those availability zones where the endpoint service can be created
+   *
+   * Setting this to 'true' requires a lookup to be performed at synthesis time. Account
+   * and region must be set on the containing stack for this to work.
+   *
+   * @default false
+   */
+  readonly lookupSupportedAzs?: boolean;
 }
 
 /**
@@ -310,12 +399,19 @@ export class InterfaceVpcEndpoint extends VpcEndpoint implements IInterfaceVpcEn
    * Imports an existing interface VPC endpoint.
    */
   public static fromInterfaceVpcEndpointAttributes(scope: Construct, id: string, attrs: InterfaceVpcEndpointAttributes): IInterfaceVpcEndpoint {
+    if (!attrs.securityGroups && !attrs.securityGroupId) {
+      throw new Error('Either `securityGroups` or `securityGroupId` must be specified.');
+    }
+
+    const securityGroups = attrs.securityGroupId
+      ? [SecurityGroup.fromSecurityGroupId(scope, 'SecurityGroup', attrs.securityGroupId)]
+      : attrs.securityGroups;
+
     class Import extends Resource implements IInterfaceVpcEndpoint {
       public readonly vpcEndpointId = attrs.vpcEndpointId;
-      public readonly securityGroupId = attrs.securityGroupId;
       public readonly connections = new Connections({
-        defaultPortRange: new TcpPort(attrs.port),
-        securityGroups: [SecurityGroup.fromSecurityGroupId(this, 'SecurityGroup', attrs.securityGroupId)],
+        defaultPort: Port.tcp(attrs.port),
+        securityGroups,
       });
     }
 
@@ -346,8 +442,10 @@ export class InterfaceVpcEndpoint extends VpcEndpoint implements IInterfaceVpcEn
   public readonly vpcEndpointNetworkInterfaceIds: string[];
 
   /**
-   * The identifier of the security group associated with this interface VPC
-   * endpoint.
+   * The identifier of the first security group associated with this interface
+   * VPC endpoint.
+   *
+   * @deprecated use the `connections` object
    */
   public readonly securityGroupId: string;
 
@@ -359,32 +457,68 @@ export class InterfaceVpcEndpoint extends VpcEndpoint implements IInterfaceVpcEn
   constructor(scope: Construct, id: string, props: InterfaceVpcEndpointProps) {
     super(scope, id);
 
-    const securityGroup = new SecurityGroup(this, 'SecurityGroup', {
-      vpc: props.vpc
-    });
-    this.securityGroupId = securityGroup.securityGroupId;
+    const securityGroups = props.securityGroups || [new SecurityGroup(this, 'SecurityGroup', {
+      vpc: props.vpc,
+    })];
+
+    this.securityGroupId = securityGroups[0].securityGroupId;
     this.connections = new Connections({
-      defaultPortRange: new TcpPort(props.service.port),
-      securityGroups: [securityGroup]
+      defaultPort: Port.tcp(props.service.port),
+      securityGroups,
     });
 
-    const subnets = props.vpc.selectSubnets({ ...props.subnets, onePerAz: true });
-    const subnetIds = subnets.subnetIds;
+    if (props.open !== false) {
+      this.connections.allowDefaultPortFrom(Peer.ipv4(props.vpc.vpcCidrBlock));
+    }
+
+    const lookupSupportedAzs = props.lookupSupportedAzs ?? false;
+    const subnetSelection = props.vpc.selectSubnets({ ...props.subnets, onePerAz: true });
+    let subnets;
+
+    // If we don't have an account/region, we will not be able to do filtering on AZs since
+    // they will be undefined
+    // Otherwise, we filter by AZ
+    const agnostic = (Token.isUnresolved(this.stack.account) || Token.isUnresolved(this.stack.region));
+
+    if (agnostic && lookupSupportedAzs) {
+      throw new Error('Cannot look up VPC endpoint availability zones if account/region are not specified');
+    } else if (!agnostic && lookupSupportedAzs) {
+      const availableAZs = this.availableAvailabilityZones(props.service.name);
+      subnets = subnetSelection.subnets.filter(s => availableAZs.includes(s.availabilityZone));
+    } else {
+      subnets = subnetSelection.subnets;
+    }
+    const subnetIds = subnets.map(s => s.subnetId);
 
     const endpoint = new CfnVPCEndpoint(this, 'Resource', {
-      privateDnsEnabled: props.privateDnsEnabled !== undefined ? props.privateDnsEnabled : true,
-      policyDocument: new Token(() => this.policyDocument),
-      securityGroupIds: [this.securityGroupId],
+      privateDnsEnabled: props.privateDnsEnabled ?? props.service.privateDnsDefault ?? true,
+      policyDocument: Lazy.anyValue({ produce: () => this.policyDocument }),
+      securityGroupIds: securityGroups.map(s => s.securityGroupId),
       serviceName: props.service.name,
-      vpcEndpointType: VpcEndpointType.Interface,
+      vpcEndpointType: VpcEndpointType.INTERFACE,
       subnetIds,
-      vpcId: props.vpc.vpcId
+      vpcId: props.vpc.vpcId,
     });
 
-    this.vpcEndpointId = endpoint.vpcEndpointId;
-    this.vpcEndpointCreationTimestamp = endpoint.vpcEndpointCreationTimestamp;
-    this.vpcEndpointDnsEntries = endpoint.vpcEndpointDnsEntries;
-    this.vpcEndpointNetworkInterfaceIds = endpoint.vpcEndpointNetworkInterfaceIds;
+    this.vpcEndpointId = endpoint.ref;
+    this.vpcEndpointCreationTimestamp = endpoint.attrCreationTimestamp;
+    this.vpcEndpointDnsEntries = endpoint.attrDnsEntries;
+    this.vpcEndpointNetworkInterfaceIds = endpoint.attrNetworkInterfaceIds;
+  }
+
+  private availableAvailabilityZones(serviceName: string): string[] {
+    // Here we check what AZs the endpoint service is available in
+    // If for whatever reason we can't retrieve the AZs, and no context is set,
+    // we will fall back to all AZs
+    const availableAZs = ContextProvider.getValue(this, {
+      provider: cxschema.ContextProvider.ENDPOINT_SERVICE_AVAILABILITY_ZONE_PROVIDER,
+      dummyValue: this.stack.availabilityZones,
+      props: {serviceName},
+    }).value;
+    if (!Array.isArray(availableAZs)) {
+      throw new Error(`Discovered AZs for endpoint service ${serviceName} must be an array`);
+    }
+    return availableAZs;
   }
 }
 
@@ -399,8 +533,16 @@ export interface InterfaceVpcEndpointAttributes {
 
   /**
    * The identifier of the security group associated with the interface VPC endpoint.
+   *
+   * @deprecated use `securityGroups` instead
    */
-  readonly securityGroupId: string;
+  readonly securityGroupId?: string;
+
+  /**
+   * The security groups associated with the interface VPC endpoint.
+   *
+   */
+  readonly securityGroups?: ISecurityGroup[];
 
   /**
    * The port of the service of the interface VPC endpoint.

@@ -1,16 +1,23 @@
-import cxapi = require('@aws-cdk/cx-api');
-import minimatch = require('minimatch');
-import { AppStacks, ExtendedStackSelection } from './stacks';
+import * as cxapi from '@aws-cdk/cx-api';
+import * as minimatch from 'minimatch';
+import { SdkProvider } from '../aws-auth';
+import { StackCollection } from './cloud-assembly';
 
-export async function globEnvironmentsFromStacks(appStacks: AppStacks, environmentGlobs: string[]): Promise<cxapi.Environment[]> {
-  if (environmentGlobs.length === 0) {
-    environmentGlobs = [ '**' ]; // default to ALL
+export function looksLikeGlob(environment: string) {
+  return environment.indexOf('*') > -1;
+}
+
+// tslint:disable-next-line:max-line-length
+export async function globEnvironmentsFromStacks(stacks: StackCollection, environmentGlobs: string[], sdk: SdkProvider): Promise<cxapi.Environment[]> {
+  if (environmentGlobs.length === 0) { return []; }
+
+  const availableEnvironments = new Array<cxapi.Environment>();
+  for (const stack of stacks.stackArtifacts) {
+    const actual = await sdk.resolveEnvironment(stack.environment);
+    availableEnvironments.push(actual);
   }
-  const stacks = await appStacks.selectStacks([], ExtendedStackSelection.None);
 
-  const availableEnvironments = distinct(stacks.map(stack => stack.environment)
-                            .filter(env => env !== undefined) as cxapi.Environment[]);
-  const environments = availableEnvironments.filter(env => environmentGlobs.find(glob => minimatch(env!.name, glob)));
+  const environments = distinct(availableEnvironments).filter(env => environmentGlobs.find(glob => minimatch(env!.name, glob)));
   if (environments.length === 0) {
     const globs = JSON.stringify(environmentGlobs);
     const envList = availableEnvironments.length > 0 ? availableEnvironments.map(env => env!.name).join(', ') : '<none>';
@@ -24,21 +31,18 @@ export async function globEnvironmentsFromStacks(appStacks: AppStacks, environme
  * Given a set of "<account>/<region>" strings, construct environments for them
  */
 export function environmentsFromDescriptors(envSpecs: string[]): cxapi.Environment[] {
-  if (envSpecs.length === 0) {
-    throw new Error(`Either specify an app with '--app', or specify an environment name like '123456789012/us-east-1'`);
-  }
-
   const ret = new Array<cxapi.Environment>();
+
   for (const spec of envSpecs) {
-    const parts = spec.split('/');
+    const parts = spec.replace(/^aws:\/\//, '').split('/');
     if (parts.length !== 2) {
-      throw new Error(`Expected environment name in format '<account>/<region>', got: ${spec}`);
+      throw new Error(`Expected environment name in format 'aws://<account>/<region>', got: ${spec}`);
     }
 
     ret.push({
       name: spec,
       account: parts[0],
-      region: parts[1]
+      region: parts[1],
     });
   }
 

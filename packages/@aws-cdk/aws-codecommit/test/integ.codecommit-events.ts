@@ -1,11 +1,13 @@
-import sns = require('@aws-cdk/aws-sns');
-import cdk = require('@aws-cdk/cdk');
-import codecommit = require('../lib');
+import * as sns from '@aws-cdk/aws-sns';
+import * as cdk from '@aws-cdk/core';
+import * as codecommit from '../lib';
 
 const app = new cdk.App();
 const stack = new cdk.Stack(app, 'aws-cdk-codecommit-events');
 
-const repo = new codecommit.Repository(stack, 'Repo', { repositoryName: 'aws-cdk-codecommit-events' });
+const repo = new codecommit.Repository(stack, 'Repo', {
+  repositoryName: 'aws-cdk-codecommit-events',
+});
 const topic = new sns.Topic(stack, 'MyTopic');
 
 // we can't use @aws-cdk/aws-events-targets.SnsTopic here because it will
@@ -14,9 +16,9 @@ repo.onReferenceCreated('OnReferenceCreated', {
   target: {
     bind: () => ({
       arn: topic.topicArn,
-      id: 'MyTopic'
-    })
-  }
+      id: '',
+    }),
+  },
 });
 
 app.synth();

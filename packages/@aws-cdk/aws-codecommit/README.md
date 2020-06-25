@@ -1,13 +1,10 @@
 ## AWS CodeCommit Construct Library
 <!--BEGIN STABILITY BANNER-->
-
 ---
 
-![Stability: Experimental](https://img.shields.io/badge/stability-Experimental-important.svg?style=for-the-badge)
+![cfn-resources: Stable](https://img.shields.io/badge/cfn--resources-stable-success.svg?style=for-the-badge)
 
-> This API is still under active development and subject to non-backward
-> compatible changes or removal in any future version. Use of the API is not recommended in production
-> environments. Experimental APIs are not subject to the Semantic Versioning model.
+![cdk-constructs: Stable](https://img.shields.io/badge/cdk--constructs-stable-success.svg?style=for-the-badge)
 
 ---
 <!--END STABILITY BANNER-->
@@ -20,7 +17,7 @@ see the [AWS CodeCommit documentation](https://docs.aws.amazon.com/codecommit).
 To add a CodeCommit Repository to your stack:
 
 ```ts
-import codecommit = require('@aws-cdk/aws-codecommit');
+import * as codecommit from '@aws-cdk/aws-codecommit';
 
 const repo = new codecommit.Repository(this, 'Repository' ,{
     repositoryName: 'MyRepositoryName',
@@ -43,9 +40,13 @@ and invoke targets as a result:
 
 ```ts
 // starts a CodeBuild project when a commit is pushed to the "master" branch of the repo
-repo.onCommit('CommitToMaster', project, 'master');
+repo.onCommit('CommitToMaster', {
+    target: new targets.CodeBuildProject(project),
+    branches: ['master'],
+});
 
 // publishes a message to an Amazon SNS topic when a comment is made on a pull request
-const rule = repo.onCommentOnPullRequest('CommentOnPullRequest');
-rule.addTarget(myTopic);
+const rule = repo.onCommentOnPullRequest('CommentOnPullRequest', {
+    target: new targets.SnsTopic(myTopic),
+});
 ```

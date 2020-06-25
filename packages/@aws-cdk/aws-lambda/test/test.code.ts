@@ -1,42 +1,30 @@
 import { expect, haveResource, haveResourceLike, ResourcePart } from '@aws-cdk/assert';
-import assets = require('@aws-cdk/assets');
-import cdk = require('@aws-cdk/cdk');
-import cxapi = require('@aws-cdk/cx-api');
+import * as cdk from '@aws-cdk/core';
+import * as cxapi from '@aws-cdk/cx-api';
 import { Test } from 'nodeunit';
-import path = require('path');
-import lambda = require('../lib');
+import * as path from 'path';
+import * as lambda from '../lib';
 
 // tslint:disable:no-string-literal
 
 export = {
-  'lambda.Code.inline': {
+  'lambda.Code.fromInline': {
     'fails if used with unsupported runtimes'(test: Test) {
-      test.throws(() => defineFunction(lambda.Code.inline('boom'), lambda.Runtime.Go1x), /Inline source not allowed for go1\.x/);
-      test.throws(() => defineFunction(lambda.Code.inline('boom'), lambda.Runtime.Java8), /Inline source not allowed for java8/);
+      test.throws(() => defineFunction(lambda.Code.fromInline('boom'), lambda.Runtime.GO_1_X), /Inline source not allowed for go1\.x/);
+      test.throws(() => defineFunction(lambda.Code.fromInline('boom'), lambda.Runtime.JAVA_8), /Inline source not allowed for java8/);
       test.done();
     },
     'fails if larger than 4096 bytes'(test: Test) {
       test.throws(
-        () => defineFunction(lambda.Code.inline(generateRandomString(4097)), lambda.Runtime.NodeJS810),
+        () => defineFunction(lambda.Code.fromInline(generateRandomString(4097)), lambda.Runtime.NODEJS_10_X),
         /Lambda source is too large, must be <= 4096 but is 4097/);
       test.done();
-    }
-  },
-  'lambda.Code.asset': {
-    'determines packaging type from file type'(test: Test) {
-      // WHEN
-      const fileAsset = lambda.Code.asset(path.join(__dirname, 'handler.zip'));
-      const directoryAsset = lambda.Code.asset(path.join(__dirname, 'my-lambda-handler'));
-
-      // THEN
-      test.deepEqual(fileAsset.packaging, assets.AssetPackaging.File);
-      test.deepEqual(directoryAsset.packaging, assets.AssetPackaging.ZipDirectory);
-      test.done();
     },
-
+  },
+  'lambda.Code.fromAsset': {
     'fails if a non-zip asset is used'(test: Test) {
       // GIVEN
-      const fileAsset = lambda.Code.asset(path.join(__dirname, 'my-lambda-handler', 'index.py'));
+      const fileAsset = lambda.Code.fromAsset(path.join(__dirname, 'my-lambda-handler', 'index.py'));
 
       // THEN
       test.throws(() => defineFunction(fileAsset), /Asset must be a \.zip file or a directory/);
@@ -47,19 +35,19 @@ export = {
       // GIVEN
       const app = new cdk.App();
       const stack = new cdk.Stack(app, 'MyStack');
-      const directoryAsset = lambda.Code.asset(path.join(__dirname, 'my-lambda-handler'));
+      const directoryAsset = lambda.Code.fromAsset(path.join(__dirname, 'my-lambda-handler'));
 
       // WHEN
       new lambda.Function(stack, 'Func1', {
         handler: 'foom',
-        runtime: lambda.Runtime.NodeJS810,
-        code: directoryAsset
+        runtime: lambda.Runtime.NODEJS_10_X,
+        code: directoryAsset,
       });
 
       new lambda.Function(stack, 'Func2', {
         handler: 'foom',
-        runtime: lambda.Runtime.NodeJS810,
-        code: directoryAsset
+        runtime: lambda.Runtime.NODEJS_10_X,
+        code: directoryAsset,
       });
 
       // THEN
@@ -67,12 +55,7 @@ export = {
       const synthesized = assembly.stacks[0];
 
       // Func1 has an asset, Func2 does not
-      const metadata = synthesized.manifest.metadata || {};
-      test.ok(metadata['/MyStack/Func1/Code']);
-      test.deepEqual(metadata['/MyStack/Func1/Code'].length, 1);
-      test.deepEqual(metadata['/MyStack/Func1/Code'][0].type, 'aws:cdk:asset');
-      test.deepEqual(metadata['/MyStack/Func2/Code'], undefined);
-
+      test.deepEqual(synthesized.assets.length, 1);
       test.done();
     },
 
@@ -85,8 +68,8 @@ export = {
 
       // WHEN
       new lambda.Function(stack, 'Func1', {
-        code: lambda.Code.asset(location),
-        runtime: lambda.Runtime.NodeJS810,
+        code: lambda.Code.fromAsset(location),
+        runtime: lambda.Runtime.NODEJS_10_X,
         handler: 'foom',
       });
 
@@ -94,30 +77,30 @@ export = {
       expect(stack).to(haveResource('AWS::Lambda::Function', {
         Metadata: {
           [cxapi.ASSET_RESOURCE_METADATA_PATH_KEY]: 'asset.9678c34eca93259d11f2d714177347afd66c50116e1e08996eff893d3ca81232',
-          [cxapi.ASSET_RESOURCE_METADATA_PROPERTY_KEY]: 'Code'
-        }
+          [cxapi.ASSET_RESOURCE_METADATA_PROPERTY_KEY]: 'Code',
+        },
       }, ResourcePart.CompleteDefinition));
       test.done();
-    }
+    },
   },
 
-  'lambda.Code.cfnParameters': {
+  'lambda.Code.fromCfnParameters': {
     "automatically creates the Bucket and Key parameters when it's used in a Function"(test: Test) {
       const stack = new cdk.Stack();
       const code = new lambda.CfnParametersCode();
       new lambda.Function(stack, 'Function', {
         code,
-        runtime: lambda.Runtime.NodeJS810,
+        runtime: lambda.Runtime.NODEJS_10_X,
         handler: 'index.handler',
       });
 
       expect(stack).to(haveResourceLike('AWS::Lambda::Function', {
         Code: {
           S3Bucket: {
-            Ref: "FunctionLambdaSourceBucketNameParameter9E9E108F",
+            Ref: 'FunctionLambdaSourceBucketNameParameter9E9E108F',
           },
           S3Key: {
-            Ref: "FunctionLambdaSourceObjectKeyParameter1C7AED11",
+            Ref: 'FunctionLambdaSourceObjectKeyParameter1C7AED11',
           },
         },
       }));
@@ -151,7 +134,7 @@ export = {
         type: 'String',
       });
 
-      const code = lambda.Code.cfnParameters({
+      const code = lambda.Code.fromCfnParameters({
         bucketNameParam,
         objectKeyParam: bucketKeyParam,
       });
@@ -161,17 +144,17 @@ export = {
 
       new lambda.Function(stack, 'Function', {
         code,
-        runtime: lambda.Runtime.NodeJS810,
+        runtime: lambda.Runtime.NODEJS_10_X,
         handler: 'index.handler',
       });
 
       expect(stack).to(haveResourceLike('AWS::Lambda::Function', {
         Code: {
           S3Bucket: {
-            Ref: "BucketNameParam",
+            Ref: 'BucketNameParam',
           },
           S3Key: {
-            Ref: "ObjectKeyParam",
+            Ref: 'ObjectKeyParam',
           },
         },
       }));
@@ -206,11 +189,11 @@ export = {
   },
 };
 
-function defineFunction(code: lambda.Code, runtime: lambda.Runtime = lambda.Runtime.NodeJS810) {
+function defineFunction(code: lambda.Code, runtime: lambda.Runtime = lambda.Runtime.NODEJS_10_X) {
   const stack = new cdk.Stack();
   return new lambda.Function(stack, 'Func', {
     handler: 'foom',
-    code, runtime
+    code, runtime,
   });
 }
 

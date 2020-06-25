@@ -1,4 +1,5 @@
-import { DefaultTokenResolver, IResolveContext, resolve, Stack, StringConcat, Token } from '@aws-cdk/cdk';
+import { captureStackTrace, DefaultTokenResolver, IResolvable,
+  IResolveContext, Lazy, Stack, StringConcat, Token, Tokenization } from '@aws-cdk/core';
 import { IRule } from './rule-ref';
 
 /**
@@ -60,23 +61,32 @@ export abstract class RuleTargetInput {
 export interface RuleTargetInputProperties {
   /**
    * Literal input to the target service (must be valid JSON)
+   *
+   * @default - input for the event target. If the input contains a paths map
+   *   values wil be extracted from event and inserted into the `inputTemplate`.
    */
   readonly input?: string;
 
   /**
    * JsonPath to take input from the input event
+   *
+   * @default - None. The entire matched event is passed as input
    */
   readonly inputPath?: string;
 
   /**
    * Input template to insert paths map into
+   *
+   * @default - None.
    */
   readonly inputTemplate?: string;
 
   /**
    * Paths map to extract values from event and insert into `inputTemplate`
+   *
+   * @default - No values extracted from event.
    */
-  readonly inputPathsMap?: {[key: string]: string};
+  readonly inputPathsMap?: { [key: string]: string };
 }
 
 /**
@@ -106,7 +116,7 @@ class LiteralEventInput extends RuleTargetInput {
  *
  * One weird exception: if we're in object context, we MUST skip the quotes
  * around the placeholder. I assume this is so once a trivial string replace is
- * done later on by CWE, numbers are still numbers.
+ * done later on by EventBridge, numbers are still numbers.
  *
  * So in string context:
  *
@@ -134,7 +144,7 @@ class FieldAwareEventInput extends RuleTargetInput {
       if (existing !== undefined) { return existing; }
 
       fieldCounter += 1;
-      const key = f.nameHint || `f${fieldCounter}`;
+      const key = f.displayHint || `f${fieldCounter}`;
       pathToKey.set(f.path, key);
       return key;
     }
@@ -147,7 +157,7 @@ class FieldAwareEventInput extends RuleTargetInput {
       }
 
       public resolveToken(t: Token, _context: IResolveContext) {
-        if (!isEventField(t)) { return t; }
+        if (!isEventField(t)) { return Token.asString(t); }
 
         const key = keyForField(t);
         if (inputPathsMap[key] && inputPathsMap[key] !== t.path) {
@@ -164,15 +174,15 @@ class FieldAwareEventInput extends RuleTargetInput {
     let resolved: string;
     if (this.inputType === InputType.Multiline) {
       // JSONify individual lines
-      resolved = resolve(this.input, {
+      resolved = Tokenization.resolve(this.input, {
         scope: rule,
-        resolver: new EventFieldReplacer()
+        resolver: new EventFieldReplacer(),
       });
       resolved = resolved.split('\n').map(stack.toJsonString).join('\n');
     } else {
-      resolved = stack.toJsonString(resolve(this.input, {
+      resolved = stack.toJsonString(Tokenization.resolve(this.input, {
         scope: rule,
-        resolver: new EventFieldReplacer()
+        resolver: new EventFieldReplacer(),
       }));
     }
 
@@ -183,7 +193,7 @@ class FieldAwareEventInput extends RuleTargetInput {
 
     return {
       inputTemplate: this.unquoteKeyPlaceholders(resolved),
-      inputPathsMap
+      inputPathsMap,
     };
   }
 
@@ -207,9 +217,21 @@ class FieldAwareEventInput extends RuleTargetInput {
   private unquoteKeyPlaceholders(sub: string) {
     if (this.inputType !== InputType.Object) { return sub; }
 
-    return new Token((ctx: IResolveContext) =>
-      ctx.resolve(sub).replace(OPENING_STRING_REGEX, '<').replace(CLOSING_STRING_REGEX, '>')
-    ).toString();
+    return Lazy.stringValue({ produce: (ctx: IResolveContext) => Token.asString(deepUnquote(ctx.resolve(sub))) });
+
+    function deepUnquote(resolved: any): any {
+      if (Array.isArray(resolved)) {
+        return resolved.map(deepUnquote);
+      } else if (typeof(resolved) === 'object' && resolved !== null) {
+        for (const [key, value] of Object.entries(resolved)) {
+          resolved[key] = deepUnquote(value);
+        }
+        return resolved;
+      } else if (typeof(resolved) === 'string') {
+        return resolved.replace(OPENING_STRING_REGEX, '<').replace(CLOSING_STRING_REGEX, '>');
+      }
+      return resolved;
+    }
   }
 }
 
@@ -222,60 +244,85 @@ const CLOSING_STRING_REGEX = new RegExp(regexQuote(UNLIKELY_CLOSING_STRING + '"'
 /**
  * Represents a field in the event pattern
  */
-export class EventField extends Token {
+export class EventField implements IResolvable {
   /**
    * Extract the event ID from the event
    */
   public static get eventId(): string {
-    return this.fromPath('$.id', 'eventId');
+    return this.fromPath('$.id');
   }
 
   /**
    * Extract the detail type from the event
    */
   public static get detailType(): string {
-    return this.fromPath('$.detail-type', 'detailType');
+    return this.fromPath('$.detail-type');
   }
 
   /**
    * Extract the source from the event
    */
   public static get source(): string {
-    return this.fromPath('$.source', 'source');
+    return this.fromPath('$.source');
   }
 
   /**
    * Extract the account from the event
    */
   public static get account(): string {
-    return this.fromPath('$.account', 'account');
+    return this.fromPath('$.account');
   }
 
   /**
    * Extract the time from the event
    */
   public static get time(): string {
-    return this.fromPath('$.time', 'time');
+    return this.fromPath('$.time');
   }
 
   /**
    * Extract the region from the event
    */
   public static get region(): string {
-    return this.fromPath('$.region', 'region');
+    return this.fromPath('$.region');
   }
 
   /**
    * Extract a custom JSON path from the event
    */
-  public static fromPath(path: string, nameHint?: string): string {
-    return new EventField(path, nameHint).toString();
+  public static fromPath(path: string): string {
+    return new EventField(path).toString();
   }
 
-  private constructor(public readonly path: string, public readonly nameHint?: string) {
-    super(() => path);
+  /**
+   * Human readable display hint about the event pattern
+   */
+  public readonly displayHint: string;
+  public readonly creationStack: string[];
 
+  /**
+   *
+   * @param path the path to a field in the event pattern
+   */
+  private constructor(public readonly path: string) {
+    this.displayHint = this.path.replace(/^[^a-zA-Z0-9_-]+/, '').replace(/[^a-zA-Z0-9_-]/g, '-');
     Object.defineProperty(this, EVENT_FIELD_SYMBOL, { value: true });
+    this.creationStack = captureStackTrace();
+  }
+
+  public resolve(_ctx: IResolveContext): any {
+    return this.path;
+  }
+
+  public toString() {
+    return Token.asString(this, { displayHint: this.displayHint });
+  }
+
+  /**
+   * Convert the path to the field in the event pattern to JSON
+   */
+  public toJSON() {
+    return `<path:${this.path}>`;
   }
 }
 
@@ -295,5 +342,5 @@ const EVENT_FIELD_SYMBOL = Symbol.for('@aws-cdk/aws-events.EventField');
  * Quote a string for use in a regex
  */
 function regexQuote(s: string) {
-  return s.replace(/[.?*+^$[\]\\(){}|-]/g, "\\$&");
+  return s.replace(/[.?*+^$[\]\\(){}|-]/g, '\\$&');
 }

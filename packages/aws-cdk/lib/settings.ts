@@ -1,10 +1,9 @@
-import fs = require('fs-extra');
-import os = require('os');
-import fs_path = require('path');
-import yargs = require('yargs');
-import { Tag } from './api/cxapp/stacks';
+import * as fs from 'fs-extra';
+import * as os from 'os';
+import * as fs_path from 'path';
+import { Tag } from './cdk-toolkit';
 import { debug, warning } from './logging';
-import util = require('./util');
+import * as util from './util';
 
 export type SettingsMap = {[key: string]: any};
 
@@ -12,7 +11,14 @@ export const PROJECT_CONFIG = 'cdk.json';
 export const PROJECT_CONTEXT = 'cdk.context.json';
 export const USER_DEFAULTS = '~/.cdk.json';
 
+/**
+ * If a context value is an object with this key set to a truthy value, it won't be saved to cdk.context.json
+ */
+export const TRANSIENT_CONTEXT_KEY = '$dontSaveContext';
+
 const CONTEXT_KEY = 'context';
+
+export type Arguments = { readonly [name: string]: unknown };
 
 /**
  * All sources of settings combined
@@ -24,20 +30,34 @@ export class Configuration {
   public readonly defaultConfig = new Settings({
     versionReporting: true,
     pathMetadata: true,
-    output: 'cdk.out'
+    output: 'cdk.out',
   });
 
   private readonly commandLineArguments: Settings;
   private readonly commandLineContext: Settings;
-  private projectConfig: Settings;
-  private projectContext: Settings;
+  private _projectConfig?: Settings;
+  private _projectContext?: Settings;
   private loaded = false;
 
-  constructor(commandLineArguments?: yargs.Arguments) {
+  constructor(commandLineArguments?: Arguments) {
     this.commandLineArguments = commandLineArguments
-                              ? Settings.fromCommandLineArguments(commandLineArguments)
-                              : new Settings();
+      ? Settings.fromCommandLineArguments(commandLineArguments)
+      : new Settings();
     this.commandLineContext = this.commandLineArguments.subSettings([CONTEXT_KEY]).makeReadOnly();
+  }
+
+  private get projectConfig() {
+    if (!this._projectConfig) {
+      throw new Error('#load has not been called yet!');
+    }
+    return this._projectConfig;
+  }
+
+  private get projectContext() {
+    if (!this._projectContext) {
+      throw new Error('#load has not been called yet!');
+    }
+    return this._projectContext;
   }
 
   /**
@@ -45,15 +65,13 @@ export class Configuration {
    */
   public async load(): Promise<this> {
     const userConfig = await loadAndLog(USER_DEFAULTS);
-    this.projectConfig = await loadAndLog(PROJECT_CONFIG);
-    this.projectContext = await loadAndLog(PROJECT_CONTEXT);
-
-    await this.migrateLegacyContext();
+    this._projectConfig = await loadAndLog(PROJECT_CONFIG);
+    this._projectContext = await loadAndLog(PROJECT_CONTEXT);
 
     this.context = new Context(
-        this.commandLineContext,
-        this.projectConfig.subSettings([CONTEXT_KEY]).makeReadOnly(),
-        this.projectContext);
+      this.commandLineContext,
+      this.projectConfig.subSettings([CONTEXT_KEY]).makeReadOnly(),
+      this.projectContext);
 
     // Build settings from what's left
     this.settings = this.defaultConfig
@@ -78,34 +96,6 @@ export class Configuration {
     await this.projectContext.save(PROJECT_CONTEXT);
 
     return this;
-  }
-
-  /**
-   * Migrate context from the 'context' field in the projectConfig object to the dedicated object
-   *
-   * Only migrate context whose key contains a ':', to migrate only context generated
-   * by context providers.
-   */
-  private async migrateLegacyContext() {
-    const legacyContext = this.projectConfig.get([CONTEXT_KEY]);
-    if (legacyContext === undefined) { return; }
-
-    const toMigrate = Object.keys(legacyContext).filter(k => k.indexOf(':') > -1);
-    if (toMigrate.length === 0) { return; }
-
-    for (const key of toMigrate) {
-      this.projectContext.set([key], legacyContext[key]);
-      this.projectConfig.unset([CONTEXT_KEY, key]);
-    }
-
-    // If the source object is empty now, completely remove it
-    if (Object.keys(this.projectConfig.get([CONTEXT_KEY])).length === 0) {
-      this.projectConfig.unset([CONTEXT_KEY]);
-    }
-
-    // Save back
-    await this.projectConfig.save(PROJECT_CONFIG);
-    await this.projectContext.save(PROJECT_CONTEXT);
   }
 }
 
@@ -191,7 +181,7 @@ export class Settings {
    * @param argv the received CLI arguments.
    * @returns a new Settings object.
    */
-  public static fromCommandLineArguments(argv: yargs.Arguments): Settings {
+  public static fromCommandLineArguments(argv: Arguments): Settings {
     const context = this.parseStringContextListToObject(argv);
     const tags = this.parseStringTagsListToObject(argv);
 
@@ -203,9 +193,14 @@ export class Settings {
       language: argv.language,
       pathMetadata: argv.pathMetadata,
       assetMetadata: argv.assetMetadata,
+      profile: argv.profile,
       plugin: argv.plugin,
       requireApproval: argv.requireApproval,
       toolkitStackName: argv.toolkitStackName,
+      toolkitBucket: {
+        bucketName: argv.bootstrapBucketName,
+        kmsKeyId: argv.bootstrapKmsKeyId,
+      },
       versionReporting: argv.versionReporting,
       staging: argv.staging,
       output: argv.output,
@@ -220,11 +215,11 @@ export class Settings {
     return ret;
   }
 
-  private static parseStringContextListToObject(argv: yargs.Arguments): any {
+  private static parseStringContextListToObject(argv: Arguments): any {
     const context: any = {};
 
     for (const assignment of ((argv as any).context || [])) {
-      const parts = assignment.split('=', 2);
+      const parts = assignment.split(/=(.*)/, 2);
       if (parts.length === 2) {
         debug('CLI argument context: %s=%s', parts[0], parts[1]);
         if (parts[0].match(/^aws:.+/)) {
@@ -238,7 +233,7 @@ export class Settings {
     return context;
   }
 
-  private static parseStringTagsListToObject(argv: yargs.Arguments): Tag[] {
+  private static parseStringTagsListToObject(argv: Arguments): Tag[] {
     const tags: Tag[] = [];
 
     for (const assignment of ((argv as any).tags || [])) {
@@ -246,8 +241,8 @@ export class Settings {
       if (parts.length === 2) {
         debug('CLI argument tags: %s=%s', parts[0], parts[1]);
         tags.push({
-         Key: parts[0],
-         Value: parts[1]
+          Key: parts[0],
+          Value: parts[1],
         });
       } else {
         warning('Tags argument is not an assignment (key=value): %s', assignment);
@@ -269,7 +264,7 @@ export class Settings {
       this.settings = await fs.readJson(expanded);
     }
 
-    // See https://github.com/awslabs/aws-cdk/issues/59
+    // See https://github.com/aws/aws-cdk/issues/59
     this.prohibitContextKey('default-account', fileName);
     this.prohibitContextKey('default-region', fileName);
     this.warnAboutContextKey('aws:', fileName);
@@ -279,8 +274,7 @@ export class Settings {
 
   public async save(fileName: string): Promise<this> {
     const expanded = expandHomeDir(fileName);
-    await fs.writeJson(expanded, this.settings, { spaces: 2 });
-
+    await fs.writeJson(expanded, stripTransientValues(this.settings), { spaces: 2 });
     return this;
   }
 
@@ -356,4 +350,26 @@ function expandHomeDir(x: string) {
     return fs_path.join(os.homedir(), x.substr(1));
   }
   return x;
+}
+
+/**
+ * Return all context value that are not transient context values
+ */
+function stripTransientValues(obj: {[key: string]: any}) {
+  const ret: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (!isTransientValue(value)) {
+      ret[key] = value;
+    }
+  }
+  return ret;
+}
+
+/**
+ * Return whether the given value is a transient context value
+ *
+ * Values that are objects with a magic key set to a truthy value are considered transient.
+ */
+function isTransientValue(value: any) {
+  return typeof value === 'object' && value !== null && (value as any)[TRANSIENT_CONTEXT_KEY];
 }

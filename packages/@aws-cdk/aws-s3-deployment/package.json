@@ -1,6 +1,6 @@
 {
   "name": "@aws-cdk/aws-s3-deployment",
-  "version": "0.33.0",
+  "version": "0.0.0",
   "description": "Constructs for deploying contents to S3 buckets",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -18,7 +18,8 @@
         "namespace": "Amazon.CDK.AWS.S3.Deployment",
         "packageId": "Amazon.CDK.AWS.S3.Deployment",
         "signAssembly": true,
-        "assemblyOriginatorKeyFile": "../../key.snk"
+        "assemblyOriginatorKeyFile": "../../key.snk",
+        "iconUrl": "https://raw.githubusercontent.com/aws/aws-cdk/master/logo/default-256-dark.png"
       },
       "python": {
         "distName": "aws-cdk.aws-s3-deployment",
@@ -28,7 +29,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/awslabs/aws-cdk.git",
+    "url": "https://github.com/aws/aws-cdk.git",
     "directory": "packages/@aws-cdk/aws-s3-deployment"
   },
   "scripts": {
@@ -41,7 +42,8 @@
     "package": "cdk-package",
     "awslint": "cdk-awslint",
     "build+test+package": "npm run build+test && npm run package",
-    "build+test": "npm run build && npm test"
+    "build+test": "npm run build && npm test",
+    "compat": "cdk-compat"
   },
   "cdk-build": {
     "pre": [
@@ -74,30 +76,67 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@aws-cdk/assert": "^0.33.0",
-    "cdk-build-tools": "^0.33.0",
-    "cdk-integ-tools": "^0.33.0",
-    "pkglint": "^0.33.0"
+    "@aws-cdk/assert": "0.0.0",
+    "@types/nodeunit": "^0.0.31",
+    "cdk-build-tools": "0.0.0",
+    "cdk-integ-tools": "0.0.0",
+    "nodeunit": "^0.11.3",
+    "pkglint": "0.0.0"
   },
   "dependencies": {
-    "@aws-cdk/assets": "^0.33.0",
-    "@aws-cdk/aws-cloudformation": "^0.33.0",
-    "@aws-cdk/aws-iam": "^0.33.0",
-    "@aws-cdk/aws-lambda": "^0.33.0",
-    "@aws-cdk/aws-s3": "^0.33.0",
-    "@aws-cdk/cdk": "^0.33.0"
+    "@aws-cdk/aws-cloudfront": "0.0.0",
+    "@aws-cdk/aws-iam": "0.0.0",
+    "@aws-cdk/aws-lambda": "0.0.0",
+    "@aws-cdk/aws-s3": "0.0.0",
+    "@aws-cdk/aws-s3-assets": "0.0.0",
+    "@aws-cdk/core": "0.0.0",
+    "constructs": "^3.0.2"
   },
-  "homepage": "https://github.com/awslabs/aws-cdk",
+  "homepage": "https://github.com/aws/aws-cdk",
   "peerDependencies": {
-    "@aws-cdk/assets": "^0.33.0",
-    "@aws-cdk/aws-cloudformation": "^0.33.0",
-    "@aws-cdk/aws-iam": "^0.33.0",
-    "@aws-cdk/aws-lambda": "^0.33.0",
-    "@aws-cdk/aws-s3": "^0.33.0",
-    "@aws-cdk/cdk": "^0.33.0"
+    "@aws-cdk/aws-cloudfront": "0.0.0",
+    "@aws-cdk/aws-iam": "0.0.0",
+    "@aws-cdk/aws-lambda": "0.0.0",
+    "@aws-cdk/aws-s3": "0.0.0",
+    "@aws-cdk/aws-s3-assets": "0.0.0",
+    "@aws-cdk/core": "0.0.0",
+    "constructs": "^3.0.2"
   },
   "engines": {
-    "node": ">= 8.10.0"
+    "node": ">= 10.13.0 <13 || >=13.7.0"
   },
-  "stability": "experimental"
+  "stability": "experimental",
+  "maturity": "experimental",
+  "awslint": {
+    "exclude": [
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.Expires.fromString",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.BucketDeployment",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.CacheControl.fromString",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.CacheControl.maxAge",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.CacheControl.mustRevalidate",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.CacheControl.noCache",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.CacheControl.noTransform",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.CacheControl.proxyRevalidate",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.CacheControl.setPrivate",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.CacheControl.setPublic",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.CacheControl.sMaxAge",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.Expires.value",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.CacheControl.value",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.BucketDeploymentProps",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.SourceConfig",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.UserDefinedObjectMetadata",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.ServerSideEncryption.AES_256",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.ServerSideEncryption.AWS_KMS",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.StorageClass.STANDARD",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.StorageClass.REDUCED_REDUNDANCY",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.StorageClass.STANDARD_IA",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.StorageClass.ONEZONE_IA",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.StorageClass.INTELLIGENT_TIERING",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.StorageClass.GLACIER",
+      "docs-public-apis:@aws-cdk/aws-s3-deployment.StorageClass.DEEP_ARCHIVE"
+    ]
+  },
+  "awscdkio": {
+    "announce": false
+  }
 }

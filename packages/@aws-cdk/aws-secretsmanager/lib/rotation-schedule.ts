@@ -1,5 +1,5 @@
-import lambda = require('@aws-cdk/aws-lambda');
-import { Construct, Resource } from '@aws-cdk/cdk';
+import * as lambda from '@aws-cdk/aws-lambda';
+import { Construct, Duration, Resource } from '@aws-cdk/core';
 import { ISecret } from './secret';
 import { CfnRotationSchedule } from './secretsmanager.generated';
 
@@ -8,7 +8,7 @@ import { CfnRotationSchedule } from './secretsmanager.generated';
  */
 export interface RotationScheduleOptions {
   /**
-   * THe Lambda function that can rotate the secret.
+   * The Lambda function that can rotate the secret.
    */
   readonly rotationLambda: lambda.IFunction;
 
@@ -16,9 +16,9 @@ export interface RotationScheduleOptions {
    * Specifies the number of days after the previous rotation before
    * Secrets Manager triggers the next automatic rotation.
    *
-   * @default 30
+   * @default Duration.days(30)
    */
-  readonly automaticallyAfterDays?: number;
+  readonly automaticallyAfter?: Duration;
 }
 
 /**
@@ -42,8 +42,8 @@ export class RotationSchedule extends Resource {
       secretId: props.secret.secretArn,
       rotationLambdaArn: props.rotationLambda.functionArn,
       rotationRules: {
-        automaticallyAfterDays: props.automaticallyAfterDays || 30
-      }
+        automaticallyAfterDays: props.automaticallyAfter && props.automaticallyAfter.toDays() || 30,
+      },
     });
   }
 }

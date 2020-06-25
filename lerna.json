@@ -1,11 +1,14 @@
 {
-  "lerna": "2.5.1",
+  "lerna": "3.15.0",
+  "npmClient": "yarn",
+  "useWorkspaces": true,
   "packages": [
     "packages/*",
     "packages/@aws-cdk/*",
+    "packages/@monocdk-experiment/*",
     "packages/@aws-cdk/*/lambda-packages/*",
     "tools/*"
   ],
   "rejectCycles": "true",
-  "version": "0.33.0"
+  "version": "1.47.0"
 }

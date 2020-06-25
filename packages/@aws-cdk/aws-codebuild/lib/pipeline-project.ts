@@ -1,7 +1,7 @@
-import cdk = require('@aws-cdk/cdk');
-import { CodePipelineBuildArtifacts } from './artifacts';
+import * as cdk from '@aws-cdk/core';
+import { CodePipelineArtifacts } from './codepipeline-artifacts';
+import { CodePipelineSource } from './codepipeline-source';
 import { CommonProjectProps, Project } from './project';
-import { CodePipelineSource } from './source';
 
 // tslint:disable-next-line:no-empty-interface
 export interface PipelineProjectProps extends CommonProjectProps {
@@ -14,8 +14,8 @@ export class PipelineProject extends Project {
   constructor(scope: cdk.Construct, id: string, props?: PipelineProjectProps) {
     super(scope, id, {
       source: new CodePipelineSource(),
-      artifacts: new CodePipelineBuildArtifacts(),
-      ...props
+      artifacts: new CodePipelineArtifacts(),
+      ...props,
     });
   }
 }

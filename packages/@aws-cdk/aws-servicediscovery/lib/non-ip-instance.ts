@@ -1,4 +1,4 @@
-import cdk = require('@aws-cdk/cdk');
+import * as cdk from '@aws-cdk/core';
 import { BaseInstanceProps, InstanceBase } from './instance';
 import { NamespaceType } from './namespace';
 import { IService } from './service';
@@ -38,7 +38,7 @@ export class NonIpInstance extends InstanceBase {
   constructor(scope: cdk.Construct, id: string, props: NonIpInstanceProps) {
     super(scope, id);
 
-    if (props.service.namespace.type !== NamespaceType.Http) {
+    if (props.service.namespace.type !== NamespaceType.HTTP) {
       throw new Error('This type of instance can only be registered for HTTP namespaces.');
     }
 
@@ -50,11 +50,11 @@ export class NonIpInstance extends InstanceBase {
       instanceId: props.instanceId || this.uniqueInstanceId(),
       serviceId: props.service.serviceId,
       instanceAttributes: {
-        ...props.customAttributes
-      }
+        ...props.customAttributes,
+      },
     });
 
     this.service = props.service;
-    this.instanceId = resource.instanceId;
+    this.instanceId = resource.ref;
   }
 }

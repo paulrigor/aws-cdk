@@ -11,7 +11,7 @@ export enum InstanceClass {
   /**
    * Standard instances, 3rd generation
    */
-  Standard3 = 'm3',
+  STANDARD3 = 'm3',
 
   /**
    * Standard instances, 3rd generation
@@ -21,7 +21,7 @@ export enum InstanceClass {
   /**
    * Standard instances, 4th generation
    */
-  Standard4 = 'm4',
+  STANDARD4 = 'm4',
 
   /**
    * Standard instances, 4th generation
@@ -31,7 +31,7 @@ export enum InstanceClass {
   /**
    * Standard instances, 5th generation
    */
-  Standard5 = 'm5',
+  STANDARD5 = 'm5',
 
   /**
    * Standard instances, 5th generation
@@ -39,9 +39,39 @@ export enum InstanceClass {
   M5 = 'm5',
 
   /**
+   * Standard instances with local NVME drive, 5th generation
+   */
+  STANDARD5_NVME_DRIVE = 'm5d',
+
+  /**
+   * Standard instances with local NVME drive, 5th generation
+   */
+  M5D = 'm5d',
+
+  /**
+   * Standard instances based on AMD EPYC, 5th generation
+   */
+  STANDARD5_AMD = 'm5a',
+
+  /**
+   * Standard instances based on AMD EPYC, 5th generation
+   */
+  M5A = 'm5a',
+
+  /**
+   * Standard instances based on AMD EPYC with local NVME drive, 5th generation
+   */
+  STANDARD5_AMD_NVME_DRIVE = 'm5ad',
+
+  /**
+   * Standard instances based on AMD EPYC with local NVME drive, 5th generation
+   */
+  M5AD = 'm5ad',
+
+  /**
    * Memory optimized instances, 3rd generation
    */
-  Memory3 = 'r3',
+  MEMORY3 = 'r3',
 
   /**
    * Memory optimized instances, 3rd generation
@@ -49,19 +79,79 @@ export enum InstanceClass {
   R3 = 'r3',
 
   /**
-   * Memory optimized instances, 3rd generation
+   * Memory optimized instances, 4th generation
    */
-  Memory4 = 'r4',
+  MEMORY4 = 'r4',
 
   /**
-   * Memory optimized instances, 3rd generation
+   * Memory optimized instances, 4th generation
    */
   R4 = 'r4',
 
   /**
+   * Memory optimized instances, 5th generation
+   */
+  MEMORY5 = 'r5',
+
+  /**
+   * Memory optimized instances, 5th generation
+   */
+  R5 = 'r5',
+
+  /**
+   * Memory optimized instances for high performance computing, 5th generation
+   */
+  MEMORY5_HIGH_PERFORMANCE = 'r5n',
+
+  /**
+   * Memory optimized instances for high performance computing, 5th generation
+   */
+  R5N = 'r5n',
+
+  /**
+   * Memory optimized instances with local NVME drive, 5th generation
+   */
+  MEMORY5_NVME_DRIVE = 'r5d',
+
+  /**
+   * Memory optimized instances with local NVME drive, 5th generation
+   */
+  R5D = 'r5d',
+
+  /**
+   * Memory optimized instances with local NVME drive for high performance computing, 5th generation
+   */
+  MEMORY5_NVME_DRIVE_HIGH_PERFORMANCE = 'r5dn',
+
+  /**
+   * Memory optimized instances with local NVME drive for high performance computing, 5th generation
+   */
+  R5DN = 'r5dn',
+
+  /**
+   * Memory optimized instances based on AMD EPYC, 5th generation
+   */
+  MEMORY5_AMD = 'r5a',
+
+  /**
+   * Memory optimized instances based on AMD EPYC, 5th generation
+   */
+  R5A = 'r5a',
+
+  /**
+   * Memory optimized instances based on AMD EPYC with local NVME drive, 5th generation
+   */
+  MEMORY5_AMD_NVME_DRIVE = 'r5a',
+
+  /**
+   * Memory optimized instances based on AMD EPYC with local NVME drive, 5th generation
+   */
+  R5AD = 'r5a',
+
+  /**
    * Compute optimized instances, 3rd generation
    */
-  Compute3 = 'c3',
+  COMPUTE3 = 'c3',
 
   /**
    * Compute optimized instances, 3rd generation
@@ -71,7 +161,7 @@ export enum InstanceClass {
   /**
    * Compute optimized instances, 4th generation
    */
-  Compute4 = 'c4',
+  COMPUTE4 = 'c4',
 
   /**
    * Compute optimized instances, 4th generation
@@ -81,7 +171,7 @@ export enum InstanceClass {
   /**
    * Compute optimized instances, 5th generation
    */
-  Compute5 = 'c5',
+  COMPUTE5 = 'c5',
 
   /**
    * Compute optimized instances, 5th generation
@@ -89,9 +179,29 @@ export enum InstanceClass {
   C5 = 'c5',
 
   /**
+   * Compute optimized instances with local NVME drive, 5th generation
+   */
+  COMPUTE5_NVME_DRIVE = 'c5d',
+
+  /**
+   * Compute optimized instances with local NVME drive, 5th generation
+   */
+  C5D = 'c5d',
+
+  /**
+   * Compute optimized instances for high performance computing, 5th generation
+   */
+  COMPUTE5_HIGH_PERFORMANCE = 'c5n',
+
+  /**
+   * Compute optimized instances for high performance computing, 5th generation
+   */
+  C5N = 'c5n',
+
+  /**
    * Storage-optimized instances, 2nd generation
    */
-  Storage2 = 'd2',
+  STORAGE2 = 'd2',
 
   /**
    * Storage-optimized instances, 2nd generation
@@ -101,7 +211,7 @@ export enum InstanceClass {
   /**
    * Storage/compute balanced instances, 1st generation
    */
-  StorageCompute1 = 'h1',
+  STORAGE_COMPUTE_1 = 'h1',
 
   /**
    * Storage/compute balanced instances, 1st generation
@@ -111,7 +221,7 @@ export enum InstanceClass {
   /**
    * I/O-optimized instances, 3rd generation
    */
-  Io3 = 'i3',
+  IO3 = 'i3',
 
   /**
    * I/O-optimized instances, 3rd generation
@@ -119,9 +229,19 @@ export enum InstanceClass {
   I3 = 'i3',
 
   /**
+   * I/O-optimized instances with local NVME drive, 3rd generation
+   */
+  IO3_DENSE_NVME_DRIVE = 'i3en',
+
+  /**
+   * I/O-optimized instances with local NVME drive, 3rd generation
+   */
+  I3EN = 'i3en',
+
+  /**
    * Burstable instances, 2nd generation
    */
-  Burstable2 = 't2',
+  BURSTABLE2 = 't2',
 
   /**
    * Burstable instances, 2nd generation
@@ -131,7 +251,7 @@ export enum InstanceClass {
   /**
    * Burstable instances, 3rd generation
    */
-  Burstable3 = 't3',
+  BURSTABLE3 = 't3',
 
   /**
    * Burstable instances, 3rd generation
@@ -139,9 +259,19 @@ export enum InstanceClass {
   T3 = 't3',
 
   /**
+   * Burstable instances based on AMD EPYC, 3rd generation
+   */
+  BURSTABLE3_AMD = 't3a',
+
+  /**
+   * Burstable instances based on AMD EPYC, 3rd generation
+   */
+  T3A = 't3a',
+
+  /**
    * Memory-intensive instances, 1st generation
    */
-  MemoryIntensive1 = 'x1',
+  MEMORY_INTENSIVE_1 = 'x1',
 
   /**
    * Memory-intensive instances, 1st generation
@@ -151,17 +281,17 @@ export enum InstanceClass {
   /**
    * Memory-intensive instances, extended, 1st generation
    */
-  MemoryIntensive1Extended = 'x1e',
+  MEMORY_INTENSIVE_1_EXTENDED = 'x1e',
 
   /**
    * Memory-intensive instances, 1st generation
    */
-  X1e = 'x1e',
+  X1E = 'x1e',
 
   /**
    * Instances with customizable hardware acceleration, 1st generation
    */
-  Fpga1 = 'f1',
+  FPGA1 = 'f1',
 
   /**
    * Instances with customizable hardware acceleration, 1st generation
@@ -171,7 +301,7 @@ export enum InstanceClass {
   /**
    * Graphics-optimized instances, 3rd generation
    */
-  Graphics3 = 'g3',
+  GRAPHICS3 = 'g3',
 
   /**
    * Graphics-optimized instances, 3rd generation
@@ -179,9 +309,19 @@ export enum InstanceClass {
   G3 = 'g3',
 
   /**
+   * Graphics-optimized instances with NVME drive for high performance computing, 4th generation
+   */
+  GRAPHICS4_NVME_DRIVE_HIGH_PERFORMANCE = 'g4dn',
+
+  /**
+   * Graphics-optimized instances with NVME drive for high performance computing, 4th generation
+   */
+  G4DN = 'g4dn',
+
+  /**
    * Parallel-processing optimized instances, 2nd generation
    */
-  Parallel2 = 'p2',
+  PARALLEL2 = 'p2',
 
   /**
    * Parallel-processing optimized instances, 2nd generation
@@ -191,34 +331,148 @@ export enum InstanceClass {
   /**
    * Parallel-processing optimized instances, 3nd generation
    */
-  Parallel3 = 'p3',
+  PARALLEL3 = 'p3',
 
   /**
    * Parallel-processing optimized instances, 3nd generation
    */
   P3 = 'p3',
+
+  /**
+   * Arm processor based instances, 1st generation
+   */
+  ARM1 = 'a1',
+
+  /**
+   * Arm processor based instances, 1st generation
+   */
+  A1 = 'a1',
+
+  /**
+   * Arm processor based instances, 2nd generation
+   */
+  STANDARD6_GRAVITON = 'm6g',
+
+  /**
+   * Arm processor based instances, 2nd generation
+   */
+  M6G = 'm6g',
+
+  /**
+   * High memory and compute capacity instances, 1st generation
+   */
+  HIGH_COMPUTE_MEMORY1 = 'z1d',
+
+  /**
+   * High memory and compute capacity instances, 1st generation
+   */
+  Z1D = 'z1d',
+
+  /**
+   * Inferentia Chips based instances for machine learning inference applications, 1st generation
+   */
+  INFERENCE1 = 'inf1',
+
+  /**
+   * Inferentia Chips based instances for machine learning inference applications, 1st generation
+   */
+  INF1 = 'inf1'
 }
 
 /**
  * What size of instance to use
  */
 export enum InstanceSize {
-  Nano = 'nano',
-  Micro = 'micro',
-  Small = 'small',
-  Medium = 'medium',
-  Large = 'large',
-  XLarge = 'xlarge',
-  XLarge2 = '2xlarge',
-  XLarge4 = '4xlarge',
-  XLarge8 = '8xlarge',
-  XLarge9 = '9xlarge',
-  XLarge10 = '10xlarge',
-  XLarge12 = '12xlarge',
-  XLarge16 = '16xlarge',
-  XLarge18 = '18xlarge',
-  XLarge24 = '24xlarge',
-  XLarge32 = '32xlarge',
+  /**
+   * Instance size NANO (nano)
+   */
+  NANO = 'nano',
+
+  /**
+   * Instance size MICRO (micro)
+   */
+  MICRO = 'micro',
+
+  /**
+   * Instance size SMALL (small)
+   */
+  SMALL = 'small',
+
+  /**
+   * Instance size MEDIUM (medium)
+   */
+  MEDIUM = 'medium',
+
+  /**
+   * Instance size LARGE (large)
+   */
+  LARGE = 'large',
+
+  /**
+   * Instance size XLARGE (xlarge)
+   */
+  XLARGE = 'xlarge',
+
+  /**
+   * Instance size XLARGE2 (2xlarge)
+   */
+  XLARGE2 = '2xlarge',
+
+  /**
+   * Instance size XLARGE4 (4xlarge)
+   */
+  XLARGE4 = '4xlarge',
+
+  /**
+   * Instance size XLARGE6 (6xlarge)
+   */
+  XLARGE6 = '6xlarge',
+
+  /**
+   * Instance size XLARGE8 (8xlarge)
+   */
+  XLARGE8 = '8xlarge',
+
+  /**
+   * Instance size XLARGE9 (9xlarge)
+   */
+  XLARGE9 = '9xlarge',
+
+  /**
+   * Instance size XLARGE10 (10xlarge)
+   */
+  XLARGE10 = '10xlarge',
+
+  /**
+   * Instance size XLARGE12 (12xlarge)
+   */
+  XLARGE12 = '12xlarge',
+
+  /**
+   * Instance size XLARGE16 (16xlarge)
+   */
+  XLARGE16 = '16xlarge',
+
+  /**
+   * Instance size XLARGE18 (18xlarge)
+   */
+  XLARGE18 = '18xlarge',
+
+  /**
+   * Instance size XLARGE24 (24xlarge)
+   */
+  XLARGE24 = '24xlarge',
+
+  /**
+   * Instance size XLARGE32 (32xlarge)
+   */
+  XLARGE32 = '32xlarge',
+
+  /**
+   * Instance size METAL (metal)
+   */
+  METAL = 'metal',
+
 }
 
 /**
@@ -228,6 +482,18 @@ export enum InstanceSize {
  * know the identifier of the type you want.
  */
 export class InstanceType {
+  /**
+   * Instance type for EC2 instances
+   *
+   * This class takes a combination of a class and size.
+   *
+   * Be aware that not all combinations of class and size are available, and not all
+   * classes are available in all regions.
+   */
+  public static of(instanceClass: InstanceClass, instanceSize: InstanceSize) {
+    return new InstanceType(`${instanceClass}.${instanceSize}`);
+  }
+
   constructor(private readonly instanceTypeIdentifier: string) {
   }
 
@@ -236,20 +502,5 @@ export class InstanceType {
    */
   public toString(): string {
     return this.instanceTypeIdentifier;
-  }
-}
-
-/**
- * Instance type for EC2 instances
- *
- * This class takes a combination of a class and size.
- *
- * Be aware that not all combinations of class and size are available, and not all
- * classes are available in all regions.
- */
-export class InstanceTypePair extends InstanceType {
-  constructor(public readonly instanceClass: InstanceClass,
-              public readonly instanceSize: InstanceSize) {
-    super(instanceClass + '.' + instanceSize);
   }
 }

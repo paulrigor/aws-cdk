@@ -1,20 +1,20 @@
 #!/usr/bin/env node
-import ec2 = require('@aws-cdk/aws-ec2');
-import cdk = require('@aws-cdk/cdk');
-import autoscaling = require('../lib');
+import * as ec2 from '@aws-cdk/aws-ec2';
+import * as cdk from '@aws-cdk/core';
+import * as autoscaling from '../lib';
 
 const app = new cdk.App();
 const stack = new cdk.Stack(app, 'aws-cdk-autoscaling-integ');
 
 const vpc = new ec2.Vpc(stack, 'VPC', {
-  maxAZs: 2
+  maxAzs: 2,
 });
 
 new autoscaling.AutoScalingGroup(stack, 'Fleet', {
   vpc,
-  instanceType: new ec2.InstanceTypePair(ec2.InstanceClass.Burstable2, ec2.InstanceSize.Micro),
-  machineImage: new ec2.AmazonLinuxImage({ generation: ec2.AmazonLinuxGeneration.AmazonLinux2 }),
-  spotPrice: '0.20'
+  instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.MICRO),
+  machineImage: new ec2.AmazonLinuxImage({ generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2 }),
+  spotPrice: '0.20',
 });
 
 app.synth();

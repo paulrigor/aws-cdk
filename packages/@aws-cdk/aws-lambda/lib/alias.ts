@@ -1,31 +1,34 @@
-import cloudwatch = require('@aws-cdk/aws-cloudwatch');
-import { Construct, Stack } from '@aws-cdk/cdk';
-import { FunctionBase, IFunction } from './function-base';
-import { IVersion } from './lambda-version';
+import * as cloudwatch from '@aws-cdk/aws-cloudwatch';
+import { Construct } from '@aws-cdk/core';
+import { EventInvokeConfigOptions } from './event-invoke-config';
+import { IFunction, QualifiedFunctionBase } from './function-base';
+import { extractQualifierFromArn, IVersion } from './lambda-version';
 import { CfnAlias } from './lambda.generated';
 
+export interface IAlias extends IFunction {
+  /**
+   * Name of this alias.
+   *
+   * @attribute
+   */
+  readonly aliasName: string;
+
+  /**
+   * The underlying Lambda function version.
+   */
+  readonly version: IVersion;
+}
+
 /**
- * Properties for a new Lambda alias
+ * Options for `lambda.Alias`.
  */
-export interface AliasProps {
+export interface AliasOptions extends EventInvokeConfigOptions {
   /**
    * Description for the alias
    *
    * @default No description
    */
   readonly description?: string;
-
-  /**
-   * Function version this alias refers to
-   *
-   * Use lambda.addVersion() to obtain a new lambda version to refer to.
-   */
-  readonly version: IVersion;
-
-  /**
-   * Name of this alias
-   */
-  readonly aliasName: string;
 
   /**
    * Additional versions with individual weights this alias points to
@@ -45,12 +48,57 @@ export interface AliasProps {
    * @default No additional versions
    */
   readonly additionalVersions?: VersionWeight[];
+
+  /**
+   * Specifies a provisioned concurrency configuration for a function's alias.
+   *
+   * @default No provisioned concurrency
+   */
+  readonly provisionedConcurrentExecutions?: number;
+}
+
+/**
+ * Properties for a new Lambda alias
+ */
+export interface AliasProps extends AliasOptions {
+  /**
+   * Name of this alias
+   */
+  readonly aliasName: string;
+
+  /**
+   * Function version this alias refers to
+   *
+   * Use lambda.addVersion() to obtain a new lambda version to refer to.
+   */
+  readonly version: IVersion;
+}
+
+export interface AliasAttributes {
+  readonly aliasName: string;
+  readonly aliasVersion: IVersion;
 }
 
 /**
  * A new alias to a particular version of a Lambda function.
  */
-export class Alias extends FunctionBase {
+export class Alias extends QualifiedFunctionBase implements IAlias {
+  public static fromAliasAttributes(scope: Construct, id: string, attrs: AliasAttributes): IAlias {
+    class Imported extends QualifiedFunctionBase implements IAlias {
+      public readonly aliasName = attrs.aliasName;
+      public readonly version = attrs.aliasVersion;
+      public readonly lambda = attrs.aliasVersion.lambda;
+      public readonly functionArn = `${attrs.aliasVersion.lambda.functionArn}:${attrs.aliasName}`;
+      public readonly functionName = `${attrs.aliasVersion.lambda.functionName}:${attrs.aliasName}`;
+      public readonly grantPrincipal = attrs.aliasVersion.grantPrincipal;
+      public readonly role = attrs.aliasVersion.role;
+
+      protected readonly canCreatePermissions = false;
+      protected readonly qualifier = attrs.aliasName;
+    }
+    return new Imported(scope, id);
+  }
+
   /**
    * Name of this alias.
    *
@@ -65,6 +113,10 @@ export class Alias extends FunctionBase {
    */
   public readonly functionName: string;
 
+  public readonly lambda: IFunction;
+
+  public readonly version: IVersion;
+
   /**
    * ARN of this alias
    *
@@ -73,56 +125,71 @@ export class Alias extends FunctionBase {
    */
   public readonly functionArn: string;
 
+  protected readonly qualifier: string;
+
   protected readonly canCreatePermissions: boolean = true;
 
-  /**
-   * The actual Lambda function object that this Alias is pointing to
-   */
-  private readonly underlyingLambda: IFunction;
-
   constructor(scope: Construct, id: string, props: AliasProps) {
-    super(scope, id);
+    super(scope, id, {
+      physicalName: props.aliasName,
+    });
 
-    this.aliasName = props.aliasName;
-    this.underlyingLambda = props.version.lambda;
+    this.lambda = props.version.lambda;
+    this.aliasName = this.physicalName;
+    this.version = props.version;
 
     const alias = new CfnAlias(this, 'Resource', {
-      name: props.aliasName,
+      name: this.aliasName,
       description: props.description,
-      functionName: this.underlyingLambda.functionName,
+      functionName: this.version.lambda.functionName,
       functionVersion: props.version.version,
-      routingConfig: this.determineRoutingConfig(props)
+      routingConfig: this.determineRoutingConfig(props),
+      provisionedConcurrencyConfig: this.determineProvisionedConcurrency(props),
     });
+
+    this.functionArn = this.getResourceArnAttribute(alias.ref, {
+      service: 'lambda',
+      resource: 'function',
+      resourceName: `${this.lambda.functionName}:${this.physicalName}`,
+      sep: ':',
+    });
+
+    this.qualifier = extractQualifierFromArn(alias.ref);
+
+    if (props.onFailure || props.onSuccess || props.maxEventAge || props.retryAttempts !== undefined) {
+      this.configureAsyncInvoke({
+        onFailure: props.onFailure,
+        onSuccess: props.onSuccess,
+        maxEventAge: props.maxEventAge,
+        retryAttempts: props.retryAttempts,
+      });
+    }
 
     // ARN parsing splits on `:`, so we can only get the function's name from the ARN as resourceName...
     // And we're parsing it out (instead of using the underlying function directly) in order to have use of it incur
     // an implicit dependency on the resource.
-    this.functionName = `${Stack.of(this).parseArn(alias.aliasArn, ":").resourceName!}:${props.aliasName}`;
-    this.functionArn = alias.aliasArn;
-  }
-
-  /**
-   * Role associated with this alias
-   */
-  public get role() {
-    return this.underlyingLambda.role;
+    this.functionName = `${this.stack.parseArn(this.functionArn, ':').resourceName!}:${this.aliasName}`;
   }
 
   public get grantPrincipal() {
-    return this.underlyingLambda.grantPrincipal;
+    return this.version.grantPrincipal;
+  }
+
+  public get role() {
+    return this.version.role;
   }
 
   public metric(metricName: string, props: cloudwatch.MetricOptions = {}): cloudwatch.Metric {
     // Metrics on Aliases need the "bare" function name, and the alias' ARN, this differes from the base behavior.
     return super.metric(metricName, {
       dimensions: {
-        FunctionName: this.underlyingLambda.functionName,
-        // construct the ARN from the underlying lambda so that alarms on an alias
+        FunctionName: this.lambda.functionName,
+        // construct the name from the underlying lambda so that alarms on an alias
         // don't cause a circular dependency with CodeDeploy
-        // see: https://github.com/awslabs/aws-cdk/issues/2231
-        Resource: `${this.underlyingLambda.functionArn}:${this.aliasName}`
+        // see: https://github.com/aws/aws-cdk/issues/2231
+        Resource: `${this.lambda.functionName}:${this.aliasName}`,
       },
-      ...props
+      ...props,
     });
   }
 
@@ -140,9 +207,9 @@ export class Alias extends FunctionBase {
       additionalVersionWeights: props.additionalVersions.map(vw => {
         return {
           functionVersion: vw.version.version,
-          functionWeight: vw.weight
+          functionWeight: vw.weight,
         };
-      })
+      }),
     };
   }
 
@@ -160,6 +227,23 @@ export class Alias extends FunctionBase {
     if (total > 1) {
       throw new Error(`Sum of additional version weights must not exceed 1, got: ${total}`);
     }
+  }
+
+  /**
+   * Validate that the provisionedConcurrentExecutions makes sense
+   *
+   * Member must have value greater than or equal to 1
+   */
+  private determineProvisionedConcurrency(props: AliasProps): CfnAlias.ProvisionedConcurrencyConfigurationProperty | undefined {
+    if (!props.provisionedConcurrentExecutions) {
+      return undefined;
+    }
+
+    if (props.provisionedConcurrentExecutions <= 0) {
+      throw new Error('provisionedConcurrentExecutions must have value greater than or equal to 1');
+    }
+
+    return {provisionedConcurrentExecutions: props.provisionedConcurrentExecutions};
   }
 }
 

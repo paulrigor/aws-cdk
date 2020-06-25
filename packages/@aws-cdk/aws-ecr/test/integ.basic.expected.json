@@ -6,7 +6,9 @@
         "LifecyclePolicy": {
           "LifecyclePolicyText": "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":5},\"action\":{\"type\":\"expire\"}}]}"
         }
-      }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain"
     }
   },
   "Outputs": {
@@ -48,7 +50,11 @@
                 }
               ]
             },
-            ".amazonaws.com/",
+            ".",
+            {
+              "Ref": "AWS::URLSuffix"
+            },
+            "/",
             {
               "Ref": "Repo02AC86CF"
             }

@@ -1,5 +1,6 @@
-import events = require('@aws-cdk/aws-events');
-import { Construct, IConstruct, IResource, Resource, Stack } from '@aws-cdk/cdk';
+import * as events from '@aws-cdk/aws-events';
+import * as iam from '@aws-cdk/aws-iam';
+import { Construct, IConstruct, IResource, Lazy, Resource, Stack } from '@aws-cdk/core';
 import { CfnRepository } from './codecommit.generated';
 
 export interface IRepository extends IResource {
@@ -31,51 +32,71 @@ export interface IRepository extends IResource {
    * Defines a CloudWatch event rule which triggers for repository events. Use
    * `rule.addEventPattern(pattern)` to specify a filter.
    */
-  onEvent(id: string, options: events.OnEventOptions): events.Rule;
+  onEvent(id: string, options?: events.OnEventOptions): events.Rule;
 
   /**
    * Defines a CloudWatch event rule which triggers when a "CodeCommit
    * Repository State Change" event occurs.
    */
-  onStateChange(id: string, options: events.OnEventOptions): events.Rule;
+  onStateChange(id: string, options?: events.OnEventOptions): events.Rule;
 
   /**
    * Defines a CloudWatch event rule which triggers when a reference is
    * created (i.e. a new branch/tag is created) to the repository.
    */
-  onReferenceCreated(id: string, options: events.OnEventOptions): events.Rule;
+  onReferenceCreated(id: string, options?: events.OnEventOptions): events.Rule;
 
   /**
    * Defines a CloudWatch event rule which triggers when a reference is
    * updated (i.e. a commit is pushed to an existing or new branch) from the repository.
    */
-  onReferenceUpdated(id: string, options: events.OnEventOptions): events.Rule;
+  onReferenceUpdated(id: string, options?: events.OnEventOptions): events.Rule;
 
   /**
    * Defines a CloudWatch event rule which triggers when a reference is
    * delete (i.e. a branch/tag is deleted) from the repository.
    */
-  onReferenceDeleted(id: string, options: events.OnEventOptions): events.Rule;
+  onReferenceDeleted(id: string, options?: events.OnEventOptions): events.Rule;
 
   /**
    * Defines a CloudWatch event rule which triggers when a pull request state is changed.
    */
-  onPullRequestStateChange(id: string, options: events.OnEventOptions): events.Rule;
+  onPullRequestStateChange(id: string, options?: events.OnEventOptions): events.Rule;
 
   /**
    * Defines a CloudWatch event rule which triggers when a comment is made on a pull request.
    */
-  onCommentOnPullRequest(id: string, options: events.OnEventOptions): events.Rule;
+  onCommentOnPullRequest(id: string, options?: events.OnEventOptions): events.Rule;
 
   /**
    * Defines a CloudWatch event rule which triggers when a comment is made on a commit.
    */
-  onCommentOnCommit(id: string, options: events.OnEventOptions): events.Rule;
+  onCommentOnCommit(id: string, options?: events.OnEventOptions): events.Rule;
 
   /**
    * Defines a CloudWatch event rule which triggers when a commit is pushed to a branch.
    */
-  onCommit(id: string, options: OnCommitOptions): events.Rule;
+  onCommit(id: string, options?: OnCommitOptions): events.Rule;
+
+  /**
+   * Grant the given principal identity permissions to perform the actions on this repository
+   */
+  grant(grantee: iam.IGrantable, ...actions: string[]): iam.Grant;
+
+  /**
+   * Grant the given identity permissions to pull this repository.
+   */
+  grantPull(grantee: iam.IGrantable): iam.Grant;
+
+  /**
+   * Grant the given identity permissions to pull and push this repository.
+   */
+  grantPullPush(grantee: iam.IGrantable): iam.Grant;
+
+  /**
+   * Grant the given identity permissions to read this repository.
+   */
+  grantRead(grantee: iam.IGrantable): iam.Grant;
 }
 
 /**
@@ -117,11 +138,11 @@ abstract class RepositoryBase extends Resource implements IRepository {
    * Defines a CloudWatch event rule which triggers for repository events. Use
    * `rule.addEventPattern(pattern)` to specify a filter.
    */
-  public onEvent(id: string, options: events.OnEventOptions) {
+  public onEvent(id: string, options: events.OnEventOptions = {}) {
     const rule = new events.Rule(this, id, options);
     rule.addEventPattern({
       source: [ 'aws.codecommit' ],
-      resources: [ this.repositoryArn ]
+      resources: [ this.repositoryArn ],
     });
     rule.addTarget(options.target);
     return rule;
@@ -131,7 +152,7 @@ abstract class RepositoryBase extends Resource implements IRepository {
    * Defines a CloudWatch event rule which triggers when a "CodeCommit
    * Repository State Change" event occurs.
    */
-  public onStateChange(id: string, options: events.OnEventOptions) {
+  public onStateChange(id: string, options: events.OnEventOptions = {}) {
     const rule = this.onEvent(id, options);
     rule.addEventPattern({
       detailType: [ 'CodeCommit Repository State Change' ],
@@ -143,7 +164,7 @@ abstract class RepositoryBase extends Resource implements IRepository {
    * Defines a CloudWatch event rule which triggers when a reference is
    * created (i.e. a new branch/tag is created) to the repository.
    */
-  public onReferenceCreated(id: string, options: events.OnEventOptions) {
+  public onReferenceCreated(id: string, options: events.OnEventOptions = {}) {
     const rule = this.onStateChange(id, options);
     rule.addEventPattern({ detail: { event: [ 'referenceCreated' ] } });
     return rule;
@@ -153,7 +174,7 @@ abstract class RepositoryBase extends Resource implements IRepository {
    * Defines a CloudWatch event rule which triggers when a reference is
    * updated (i.e. a commit is pushed to an existing or new branch) from the repository.
    */
-  public onReferenceUpdated(id: string, options: events.OnEventOptions) {
+  public onReferenceUpdated(id: string, options: events.OnEventOptions = {}) {
     const rule = this.onStateChange(id, options);
     rule.addEventPattern({ detail: { event: [ 'referenceCreated', 'referenceUpdated' ] } });
     return rule;
@@ -163,7 +184,7 @@ abstract class RepositoryBase extends Resource implements IRepository {
    * Defines a CloudWatch event rule which triggers when a reference is
    * delete (i.e. a branch/tag is deleted) from the repository.
    */
-  public onReferenceDeleted(id: string, options: events.OnEventOptions) {
+  public onReferenceDeleted(id: string, options: events.OnEventOptions = {}) {
     const rule = this.onStateChange(id, options);
     rule.addEventPattern({ detail: { event: [ 'referenceDeleted' ] } });
     return rule;
@@ -172,7 +193,7 @@ abstract class RepositoryBase extends Resource implements IRepository {
   /**
    * Defines a CloudWatch event rule which triggers when a pull request state is changed.
    */
-  public onPullRequestStateChange(id: string, options: events.OnEventOptions) {
+  public onPullRequestStateChange(id: string, options: events.OnEventOptions = {}) {
     const rule = this.onEvent(id, options);
     rule.addEventPattern({ detailType: [ 'CodeCommit Pull Request State Change' ] });
     return rule;
@@ -181,7 +202,7 @@ abstract class RepositoryBase extends Resource implements IRepository {
   /**
    * Defines a CloudWatch event rule which triggers when a comment is made on a pull request.
    */
-  public onCommentOnPullRequest(id: string, options: events.OnEventOptions) {
+  public onCommentOnPullRequest(id: string, options: events.OnEventOptions = {}) {
     const rule = this.onEvent(id, options);
     rule.addEventPattern({ detailType: [ 'CodeCommit Comment on Pull Request' ] });
     return rule;
@@ -190,7 +211,7 @@ abstract class RepositoryBase extends Resource implements IRepository {
   /**
    * Defines a CloudWatch event rule which triggers when a comment is made on a commit.
    */
-  public onCommentOnCommit(id: string, options: events.OnEventOptions) {
+  public onCommentOnCommit(id: string, options: events.OnEventOptions = {}) {
     const rule = this.onEvent(id, options);
     rule.addEventPattern({ detailType: [ 'CodeCommit Comment on Commit' ] });
     return rule;
@@ -199,18 +220,46 @@ abstract class RepositoryBase extends Resource implements IRepository {
   /**
    * Defines a CloudWatch event rule which triggers when a commit is pushed to a branch.
    */
-  public onCommit(id: string, options: OnCommitOptions) {
+  public onCommit(id: string, options: OnCommitOptions = {}) {
     const rule = this.onReferenceUpdated(id, options);
     if (options.branches) {
       rule.addEventPattern({ detail: { referenceName: options.branches }});
     }
     return rule;
   }
+
+  public grant(grantee: iam.IGrantable, ...actions: string[]) {
+    return iam.Grant.addToPrincipal({
+      grantee,
+      actions,
+      resourceArns: [this.repositoryArn],
+    });
+  }
+
+  public grantPull(grantee: iam.IGrantable) {
+    return this.grant(grantee, 'codecommit:GitPull');
+  }
+
+  public grantPullPush(grantee: iam.IGrantable) {
+    this.grantPull(grantee);
+    return this.grant(grantee, 'codecommit:GitPush');
+  }
+
+  public grantRead(grantee: iam.IGrantable) {
+    this.grantPull(grantee);
+    return this.grant(grantee,
+      'codecommit:EvaluatePullRequestApprovalRules',
+      'codecommit:Get*',
+      'codecommit:Describe*',
+    );
+  }
 }
 
 export interface RepositoryProps {
   /**
-   * Name of the repository. This property is required for all repositories.
+   * Name of the repository.
+   *
+   * This property is required for all CodeCommit repositories.
    */
   readonly repositoryName: string;
 
@@ -270,33 +319,35 @@ export class Repository extends RepositoryBase {
     });
   }
 
+  public readonly repositoryArn: string;
+  public readonly repositoryName: string;
   private readonly repository: CfnRepository;
   private readonly triggers = new Array<CfnRepository.RepositoryTriggerProperty>();
 
   constructor(scope: Construct, id: string, props: RepositoryProps) {
-    super(scope, id);
+    super(scope, id, {
+      physicalName: props.repositoryName,
+    });
 
     this.repository = new CfnRepository(this, 'Resource', {
       repositoryName: props.repositoryName,
       repositoryDescription: props.description,
-      triggers: this.triggers
+      triggers: Lazy.anyValue({ produce: () =>  this.triggers}, { omitEmptyArray: true}),
+    });
+
+    this.repositoryName = this.getResourceNameAttribute(this.repository.attrName);
+    this.repositoryArn = this.getResourceArnAttribute(this.repository.attrArn, {
+      service: 'codecommit',
+      resource: this.physicalName,
     });
   }
 
-  public get repositoryArn() {
-    return this.repository.repositoryArn;
-  }
-
   public get repositoryCloneUrlHttp() {
-    return this.repository.repositoryCloneUrlHttp;
+    return this.repository.attrCloneUrlHttp;
   }
 
   public get repositoryCloneUrlSsh() {
-    return this.repository.repositoryCloneUrlSsh;
-  }
-
-  public get repositoryName() {
-    return this.repository.repositoryName;
+    return this.repository.attrCloneUrlSsh;
   }
 
   /**
@@ -307,8 +358,8 @@ export class Repository extends RepositoryBase {
   public notify(arn: string, options?: RepositoryTriggerOptions): Repository {
 
     let evt = options && options.events;
-    if (evt && evt.length > 1 && evt.indexOf(RepositoryEventTrigger.All) > -1) {
-      evt = [RepositoryEventTrigger.All];
+    if (evt && evt.length > 1 && evt.indexOf(RepositoryEventTrigger.ALL) > -1) {
+      evt = [RepositoryEventTrigger.ALL];
     }
 
     const customData = options && options.customData;
@@ -328,7 +379,7 @@ export class Repository extends RepositoryBase {
       name,
       customData,
       branches,
-      events: evt || [RepositoryEventTrigger.All],
+      events: evt || [RepositoryEventTrigger.ALL],
     });
     return this;
   }
@@ -338,9 +389,9 @@ export class Repository extends RepositoryBase {
  * Creates for a repository trigger to an SNS topic or Lambda function.
  */
 export interface RepositoryTriggerOptions {
-   /**
-    * A name for the trigger.Triggers on a repository must have unique names
-    */
+  /**
+   * A name for the trigger.Triggers on a repository must have unique names
+   */
   readonly name?: string;
 
   /**
@@ -368,8 +419,8 @@ export interface RepositoryTriggerOptions {
  * Repository events that will cause the trigger to run actions in another service.
  */
 export enum RepositoryEventTrigger {
-  All = 'all',
-  UpdateRef = 'updateReference',
-  CreateRef = 'createReference',
-  DeleteRef = 'deleteReference'
+  ALL = 'all',
+  UPDATE_REF = 'updateReference',
+  CREATE_REF = 'createReference',
+  DELETE_REF = 'deleteReference'
 }

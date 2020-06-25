@@ -1,18 +1,23 @@
-import iam = require('@aws-cdk/aws-iam');
-import lambda = require('@aws-cdk/aws-lambda');
-import sqs = require('@aws-cdk/aws-sqs');
-import cdk = require('@aws-cdk/cdk');
-import { IResource, Resource } from '@aws-cdk/cdk';
+import * as iam from '@aws-cdk/aws-iam';
+import { Construct, IResource, Resource, Token } from '@aws-cdk/core';
 import { TopicPolicy } from './policy';
-import { Subscription, SubscriptionProtocol } from './subscription';
+import { ITopicSubscription } from './subscriber';
+import { Subscription } from './subscription';
 
+/**
+ * Represents an SNS topic
+ */
 export interface ITopic extends IResource {
   /**
+   * The ARN of the topic
+   *
    * @attribute
    */
   readonly topicArn: string;
 
   /**
+   * The name of the topic
+   *
    * @attribute
    */
   readonly topicName: string;
@@ -20,46 +25,7 @@ export interface ITopic extends IResource {
   /**
    * Subscribe some endpoint to this topic
    */
-  subscribe(name: string, endpoint: string, protocol: SubscriptionProtocol, rawMessageDelivery?: boolean): Subscription;
-
-  /**
-   * Defines a subscription from this SNS topic to an SQS queue.
-   *
-   * The queue resource policy will be updated to allow this SNS topic to send
-   * messages to the queue.
-   *
-   * @param queue The target queue
-   * @param rawMessageDelivery Enable raw message delivery
-   */
-  subscribeQueue(queue: sqs.IQueue, rawMessageDelivery?: boolean): Subscription;
-
-  /**
-   * Defines a subscription from this SNS Topic to a Lambda function.
-   *
-   * The Lambda's resource policy will be updated to allow this topic to
-   * invoke the function.
-   *
-   * @param lambdaFunction The Lambda function to invoke
-   */
-  subscribeLambda(lambdaFunction: lambda.IFunction): Subscription;
-
-  /**
-   * Defines a subscription from this SNS topic to an email address.
-   *
-   * @param name A name for the subscription
-   * @param emailAddress The email address to use.
-   * @param options Options to use for email subscription
-   */
-  subscribeEmail(name: string, emailAddress: string, options?: EmailSubscriptionOptions): Subscription;
-
-  /**
-   * Defines a subscription from this SNS topic to an http:// or https:// URL.
-   *
-   * @param name A name for the subscription
-   * @param url The URL to invoke
-   * @param rawMessageDelivery Enable raw message delivery
-   */
-  subscribeUrl(name: string, url: string, rawMessageDelivery?: boolean): Subscription;
+  addSubscription(subscription: ITopicSubscription): void;
 
   /**
    * Adds a statement to the IAM resource policy associated with this topic.
@@ -68,7 +34,7 @@ export interface ITopic extends IResource {
    * will be automatically created upon the first call to `addToPolicy`. If
    * the topic is improted (`Topic.import`), then this is a no-op.
    */
-  addToResourcePolicy(statement: iam.PolicyStatement): void;
+  addToResourcePolicy(statement: iam.PolicyStatement): iam.AddToResourcePolicyResult;
 
   /**
    * Grant topic publishing permissions to the given identity
@@ -96,126 +62,24 @@ export abstract class TopicBase extends Resource implements ITopic {
   /**
    * Subscribe some endpoint to this topic
    */
-  public subscribe(name: string, endpoint: string, protocol: SubscriptionProtocol, rawMessageDelivery?: boolean): Subscription {
-    return new Subscription(this, name, {
-      topic: this,
-      endpoint,
-      protocol,
-      rawMessageDelivery,
-    });
-  }
+  public addSubscription(subscription: ITopicSubscription) {
+    const subscriptionConfig = subscription.bind(this);
 
-  /**
-   * Defines a subscription from this SNS topic to an SQS queue.
-   *
-   * The queue resource policy will be updated to allow this SNS topic to send
-   * messages to the queue.
-   *
-   * @param queue The target queue
-   * @param rawMessageDelivery Enable raw message delivery
-   */
-  public subscribeQueue(queue: sqs.IQueue, rawMessageDelivery?: boolean): Subscription {
-    if (!cdk.Construct.isConstruct(queue)) {
-      throw new Error(`The supplied Queue object must be an instance of Construct`);
+    const scope = subscriptionConfig.subscriberScope || this;
+    let id = subscriptionConfig.subscriberId;
+    if (Token.isUnresolved(subscriptionConfig.subscriberId)) {
+      id = this.nextTokenId(scope);
     }
 
-    const subscriptionName = this.node.id + 'Subscription';
-    if (queue.node.tryFindChild(subscriptionName)) {
-      throw new Error(`A subscription between the topic ${this.node.id} and the queue ${queue.node.id} already exists`);
+    // We use the subscriber's id as the construct id. There's no meaning
+    // to subscribing the same subscriber twice on the same topic.
+    if (scope.node.tryFindChild(id)) {
+      throw new Error(`A subscription with id "${id}" already exists under the scope ${scope.node.path}`);
     }
 
-    // we use the queue name as the subscription's. there's no meaning to subscribing
-    // the same queue twice on the same topic. Create subscription under *consuming*
-    // construct to make sure it ends up in the correct stack in cases of cross-stack subscriptions.
-    const sub = new Subscription(queue, subscriptionName, {
+    new Subscription(scope, id, {
       topic: this,
-      endpoint: queue.queueArn,
-      protocol: SubscriptionProtocol.Sqs,
-      rawMessageDelivery,
-    });
-
-    // add a statement to the queue resource policy which allows this topic
-    // to send messages to the queue.
-    queue.addToResourcePolicy(new iam.PolicyStatement()
-      .addResource(queue.queueArn)
-      .addAction('sqs:SendMessage')
-      .addServicePrincipal('sns.amazonaws.com')
-      .setCondition('ArnEquals', { 'aws:SourceArn': this.topicArn }));
-
-    return sub;
-  }
-
-  /**
-   * Defines a subscription from this SNS Topic to a Lambda function.
-   *
-   * The Lambda's resource policy will be updated to allow this topic to
-   * invoke the function.
-   *
-   * @param lambdaFunction The Lambda function to invoke
-   */
-  public subscribeLambda(lambdaFunction: lambda.IFunction): Subscription {
-    if (!cdk.Construct.isConstruct(lambdaFunction)) {
-      throw new Error(`The supplied lambda Function object must be an instance of Construct`);
-    }
-
-    const subscriptionName = this.node.id + 'Subscription';
-
-    if (lambdaFunction.node.tryFindChild(subscriptionName)) {
-      throw new Error(`A subscription between the topic ${this.node.id} and the lambda ${lambdaFunction.id} already exists`);
-    }
-
-    // Create subscription under *consuming* construct to make sure it ends up
-    // in the correct stack in cases of cross-stack subscriptions.
-    const sub = new Subscription(lambdaFunction, subscriptionName, {
-      topic: this,
-      endpoint: lambdaFunction.functionArn,
-      protocol: SubscriptionProtocol.Lambda,
-    });
-
-    lambdaFunction.addPermission(this.node.id, {
-      sourceArn: this.topicArn,
-      principal: new iam.ServicePrincipal('sns.amazonaws.com'),
-    });
-
-    return sub;
-  }
-
-  /**
-   * Defines a subscription from this SNS topic to an email address.
-   *
-   * @param name A name for the subscription
-   * @param emailAddress The email address to use.
-   * @param options Options for the email delivery format.
-   */
-  public subscribeEmail(name: string, emailAddress: string, options?: EmailSubscriptionOptions): Subscription {
-    const protocol = (options && options.json ? SubscriptionProtocol.EmailJson : SubscriptionProtocol.Email);
-
-    return new Subscription(this, name, {
-      topic: this,
-      endpoint: emailAddress,
-      protocol
-    });
-  }
-
-  /**
-   * Defines a subscription from this SNS topic to an http:// or https:// URL.
-   *
-   * @param name A name for the subscription
-   * @param url The URL to invoke
-   * @param rawMessageDelivery Enable raw message delivery
-   */
-  public subscribeUrl(name: string, url: string, rawMessageDelivery?: boolean): Subscription {
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      throw new Error('URL must start with either http:// or https://');
-    }
-
-    const protocol = url.startsWith('https:') ? SubscriptionProtocol.Https : SubscriptionProtocol.Http;
-
-    return new Subscription(this, name, {
-      topic: this,
-      endpoint: url,
-      protocol,
-      rawMessageDelivery,
+      ...subscriptionConfig,
     });
   }
 
@@ -226,14 +90,16 @@ export abstract class TopicBase extends Resource implements ITopic {
    * will be automatically created upon the first call to `addToPolicy`. If
    * the topic is improted (`Topic.import`), then this is a no-op.
    */
-  public addToResourcePolicy(statement: iam.PolicyStatement) {
+  public addToResourcePolicy(statement: iam.PolicyStatement): iam.AddToResourcePolicyResult {
     if (!this.policy && this.autoCreatePolicy) {
       this.policy = new TopicPolicy(this, 'Policy', { topics: [ this ] });
     }
 
     if (this.policy) {
-      this.policy.document.addStatement(statement);
+      this.policy.document.addStatements(statement);
+      return { statementAdded: true, policyDependable: this.policy };
     }
+    return { statementAdded: false };
   }
 
   /**
@@ -248,17 +114,21 @@ export abstract class TopicBase extends Resource implements ITopic {
     });
   }
 
-}
+  private nextTokenId(scope: Construct) {
+    let nextSuffix = 1;
+    const re = /TokenSubscription:([\d]*)/gm;
+    // Search through the construct and all of its children
+    // for previous subscriptions that match our regex pattern
+    for (const source of scope.node.findAll()) {
+      const m = re.exec(source.node.id); // Use regex to find a match
+      if (m !== null) { // if we found a match
+        const matchSuffix = parseInt(m[1], 10); // get the suffix for that match (as integer)
+        if (matchSuffix >= nextSuffix) { // check if the match suffix is larger or equal to currently proposed suffix
+          nextSuffix = matchSuffix + 1; // increment the suffix
+        }
+      }
+    }
+    return `TokenSubscription:${nextSuffix}`;
+  }
 
-/**
- * Options for email subscriptions.
- */
-export interface EmailSubscriptionOptions {
-  /**
-   * Indicates if the full notification JSON should be sent to the email
-   * address or just the message text.
-   *
-   * @default Message text (false)
-   */
-  readonly json?: boolean;
 }

@@ -1,13 +1,10 @@
 # AWS Region-Specific Information Directory
 <!--BEGIN STABILITY BANNER-->
-
 ---
 
-![Stability: Experimental](https://img.shields.io/badge/stability-Experimental-important.svg?style=for-the-badge)
+![cdk-constructs: Experimental](https://img.shields.io/badge/cdk--constructs-experimental-important.svg?style=for-the-badge)
 
-> This API is still under active development and subject to non-backward
-> compatible changes or removal in any future version. Use of the API is not recommended in production
-> environments. Experimental APIs are not subject to the Semantic Versioning model.
+> The APIs of higher level constructs in this module are experimental and under active development. They are subject to non-backward compatible changes or removal in any future version. These are not subject to the [Semantic Versioning](https://semver.org/) model and breaking changes will be announced in the release notes. This means that while you may use them, you may need to update your source code when upgrading to a newer version of this package.
 
 ---
 <!--END STABILITY BANNER-->
@@ -29,7 +26,7 @@ import { RegionInfo } from '@aws-cdk/region-info';
 const region = RegionInfo.get('eu-west-1');
 
 // Access attributes:
-region.s3StaticWebsiteEndpoint; // s3-website.eu-west-1.amazonaws.com
+region.s3StaticWebsiteEndpoint; // s3-website-eu-west-1.amazonaws.com
 region.servicePrincipal('logs.amazonaws.com'); // logs.eu-west-1.amazonaws.com
 ```
 
@@ -44,12 +41,12 @@ a list of known fact names, which can then be used with the `RegionInfo` to
 retrieve a particular value:
 
 ```ts
-import regionInfo = require('@aws-cdk/region-info');
+import * as regionInfo from '@aws-cdk/region-info';
 
 const codeDeployPrincipal = regionInfo.Fact.find('us-east-1', regionInfo.FactName.servicePrincipal('codedeploy.amazonaws.com'));
 // => codedeploy.us-east-1.amazonaws.com
 
-const staticWebsite = regionInfo.Fact.find('ap-northeast-1', regionInfo.FactName.s3StaticWebsiteEndpoint);
+const staticWebsite = regionInfo.Fact.find('ap-northeast-1', regionInfo.FactName.S3_STATIC_WEBSITE_ENDPOINT);
 // => s3-website-ap-northeast-1.amazonaws.com
 ```
 
@@ -83,8 +80,8 @@ If you happen to have stumbled upon incorrect data built into this library, it
 is always a good idea to report your findings in a [GitHub issue], so we can fix
 it for everyone else!
 
-[GitHub issue]: https://github.com/awslabs/aws-cdk/issues
+[GitHub issue]: https://github.com/aws/aws-cdk/issues
 
 ---
 
-This module is part of the [AWS Cloud Development Kit](https://github.com/awslabs/aws-cdk) project.
+This module is part of the [AWS Cloud Development Kit](https://github.com/aws/aws-cdk) project.

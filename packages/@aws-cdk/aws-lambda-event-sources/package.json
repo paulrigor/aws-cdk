@@ -1,6 +1,6 @@
 {
   "name": "@aws-cdk/aws-lambda-event-sources",
-  "version": "0.33.0",
+  "version": "0.0.0",
   "description": "Event sources for AWS Lambda",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -18,7 +18,8 @@
         "namespace": "Amazon.CDK.AWS.Lambda.EventSources",
         "packageId": "Amazon.CDK.AWS.Lambda.EventSources",
         "signAssembly": true,
-        "assemblyOriginatorKeyFile": "../../key.snk"
+        "assemblyOriginatorKeyFile": "../../key.snk",
+        "iconUrl": "https://raw.githubusercontent.com/aws/aws-cdk/master/logo/default-256-dark.png"
       },
       "python": {
         "distName": "aws-cdk.aws-lambda-event-sources",
@@ -28,7 +29,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/awslabs/aws-cdk.git",
+    "url": "https://github.com/aws/aws-cdk.git",
     "directory": "packages/@aws-cdk/aws-lambda-event-sources"
   },
   "scripts": {
@@ -41,7 +42,8 @@
     "package": "cdk-package",
     "awslint": "cdk-awslint",
     "build+test+package": "npm run build+test && npm run package",
-    "build+test": "npm run build && npm test"
+    "build+test": "npm run build && npm test",
+    "compat": "cdk-compat"
   },
   "keywords": [
     "aws",
@@ -56,40 +58,64 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@aws-cdk/assert": "^0.33.0",
-    "cdk-build-tools": "^0.33.0",
-    "cdk-integ-tools": "^0.33.0",
-    "pkglint": "^0.33.0"
+    "@aws-cdk/assert": "0.0.0",
+    "@types/nodeunit": "^0.0.31",
+    "cdk-build-tools": "0.0.0",
+    "cdk-integ-tools": "0.0.0",
+    "nodeunit": "^0.11.3",
+    "pkglint": "0.0.0"
   },
   "dependencies": {
-    "@aws-cdk/aws-apigateway": "^0.33.0",
-    "@aws-cdk/aws-dynamodb": "^0.33.0",
-    "@aws-cdk/aws-events": "^0.33.0",
-    "@aws-cdk/aws-iam": "^0.33.0",
-    "@aws-cdk/aws-kinesis": "^0.33.0",
-    "@aws-cdk/aws-lambda": "^0.33.0",
-    "@aws-cdk/aws-s3": "^0.33.0",
-    "@aws-cdk/aws-s3-notifications": "^0.33.0",
-    "@aws-cdk/aws-sns": "^0.33.0",
-    "@aws-cdk/aws-sqs": "^0.33.0",
-    "@aws-cdk/cdk": "^0.33.0"
+    "@aws-cdk/aws-apigateway": "0.0.0",
+    "@aws-cdk/aws-dynamodb": "0.0.0",
+    "@aws-cdk/aws-events": "0.0.0",
+    "@aws-cdk/aws-iam": "0.0.0",
+    "@aws-cdk/aws-kinesis": "0.0.0",
+    "@aws-cdk/aws-lambda": "0.0.0",
+    "@aws-cdk/aws-s3": "0.0.0",
+    "@aws-cdk/aws-s3-notifications": "0.0.0",
+    "@aws-cdk/aws-sns": "0.0.0",
+    "@aws-cdk/aws-sns-subscriptions": "0.0.0",
+    "@aws-cdk/aws-sqs": "0.0.0",
+    "@aws-cdk/core": "0.0.0",
+    "constructs": "^3.0.2"
   },
-  "homepage": "https://github.com/awslabs/aws-cdk",
+  "homepage": "https://github.com/aws/aws-cdk",
   "peerDependencies": {
-    "@aws-cdk/aws-apigateway": "^0.33.0",
-    "@aws-cdk/aws-dynamodb": "^0.33.0",
-    "@aws-cdk/aws-events": "^0.33.0",
-    "@aws-cdk/aws-iam": "^0.33.0",
-    "@aws-cdk/aws-kinesis": "^0.33.0",
-    "@aws-cdk/aws-lambda": "^0.33.0",
-    "@aws-cdk/aws-s3": "^0.33.0",
-    "@aws-cdk/aws-s3-notifications": "^0.33.0",
-    "@aws-cdk/aws-sns": "^0.33.0",
-    "@aws-cdk/aws-sqs": "^0.33.0",
-    "@aws-cdk/cdk": "^0.33.0"
+    "@aws-cdk/aws-apigateway": "0.0.0",
+    "@aws-cdk/aws-dynamodb": "0.0.0",
+    "@aws-cdk/aws-events": "0.0.0",
+    "@aws-cdk/aws-iam": "0.0.0",
+    "@aws-cdk/aws-kinesis": "0.0.0",
+    "@aws-cdk/aws-lambda": "0.0.0",
+    "@aws-cdk/aws-s3": "0.0.0",
+    "@aws-cdk/aws-s3-notifications": "0.0.0",
+    "@aws-cdk/aws-sns": "0.0.0",
+    "@aws-cdk/aws-sns-subscriptions": "0.0.0",
+    "@aws-cdk/aws-sqs": "0.0.0",
+    "@aws-cdk/core": "0.0.0",
+    "constructs": "^3.0.2"
   },
   "engines": {
-    "node": ">= 8.10.0"
+    "node": ">= 10.13.0 <13 || >=13.7.0"
   },
-  "stability": "experimental"
+  "stability": "stable",
+  "awslint": {
+    "exclude": [
+      "docs-public-apis:@aws-cdk/aws-lambda-event-sources.ApiEventSource",
+      "docs-public-apis:@aws-cdk/aws-lambda-event-sources.KinesisEventSource.stream",
+      "docs-public-apis:@aws-cdk/aws-lambda-event-sources.S3EventSource.bucket",
+      "docs-public-apis:@aws-cdk/aws-lambda-event-sources.SnsEventSource.topic",
+      "docs-public-apis:@aws-cdk/aws-lambda-event-sources.SqsEventSource.queue",
+      "docs-public-apis:@aws-cdk/aws-lambda-event-sources.DynamoEventSourceProps",
+      "docs-public-apis:@aws-cdk/aws-lambda-event-sources.KinesisEventSourceProps",
+      "docs-public-apis:@aws-cdk/aws-lambda-event-sources.S3EventSourceProps",
+      "props-default-doc:@aws-cdk/aws-lambda-event-sources.S3EventSourceProps.filters",
+      "docs-public-apis:@aws-cdk/aws-lambda-event-sources.SqsEventSourceProps"
+    ]
+  },
+  "awscdkio": {
+    "announce": false
+  },
+  "maturity": "stable"
 }

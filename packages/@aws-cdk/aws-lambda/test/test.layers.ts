@@ -1,8 +1,10 @@
-import { countResources, expect, haveResource } from '@aws-cdk/assert';
-import s3 = require('@aws-cdk/aws-s3');
-import cdk = require('@aws-cdk/cdk');
+import { expect, haveResource, ResourcePart } from '@aws-cdk/assert';
+import * as s3 from '@aws-cdk/aws-s3';
+import * as cdk from '@aws-cdk/core';
+import * as cxapi from '@aws-cdk/cx-api';
 import { Test, testCase } from 'nodeunit';
-import lambda = require('../lib');
+import * as path from 'path';
+import * as lambda from '../lib';
 
 export = testCase({
   'creating a layer'(test: Test) {
@@ -14,7 +16,7 @@ export = testCase({
     // WHEN
     new lambda.LayerVersion(stack, 'LayerVersion', {
       code,
-      compatibleRuntimes: [lambda.Runtime.NodeJS810]
+      compatibleRuntimes: [lambda.Runtime.NODEJS_10_X],
     });
 
     // THEN
@@ -23,7 +25,7 @@ export = testCase({
         S3Bucket: stack.resolve(bucket.bucketName),
         S3Key: 'ObjectKey',
       },
-      CompatibleRuntimes: ['nodejs8.10']
+      CompatibleRuntimes: ['nodejs10.x'],
     }));
 
     test.done();
@@ -36,7 +38,7 @@ export = testCase({
     const code = new lambda.S3Code(bucket, 'ObjectKey');
     const layer = new lambda.LayerVersion(stack, 'LayerVersion', {
       code,
-      compatibleRuntimes: [lambda.Runtime.NodeJS810]
+      compatibleRuntimes: [lambda.Runtime.NODEJS_10_X],
     });
 
     // WHEN
@@ -53,7 +55,7 @@ export = testCase({
       Action: 'lambda:GetLayerVersion',
       LayerVersionArn: stack.resolve(layer.layerVersionArn),
       Principal: '*',
-      OrganizationId: 'o-123456'
+      OrganizationId: 'o-123456',
     }));
 
     test.done();
@@ -67,26 +69,28 @@ export = testCase({
 
     // THEN
     test.throws(() => new lambda.LayerVersion(stack, 'LayerVersion', { code, compatibleRuntimes: [] }),
-                /supports no runtime/);
+      /supports no runtime/);
 
     test.done();
   },
 
-  'singleton layers are created exactly once'(test: Test) {
-    // Given
-    const stack = new cdk.Stack(undefined, 'TestStack');
-    const uuid = '75F9D74A-67AF-493E-888A-20976130F0B1';
-    const bucket = new s3.Bucket(stack, 'Bucket');
-    const code = new lambda.S3Code(bucket, 'ObjectKey');
+  'asset metadata is added to the cloudformation resource'(test: Test) {
+    // GIVEN
+    const stack = new cdk.Stack();
+    stack.node.setContext(cxapi.ASSET_RESOURCE_METADATA_ENABLED_CONTEXT, true);
 
-    // When
-    for (let i = 0 ; i < 5 ; i++) {
-      new lambda.SingletonLayerVersion(stack, `Layer-${i}`, { uuid, code });
-    }
+    // WHEN
+    new lambda.LayerVersion(stack, 'layer', {
+      code: lambda.Code.fromAsset(path.join(__dirname, 'layer-code')),
+    });
 
-    // Then
-    expect(stack).to(countResources('AWS::Lambda::LayerVersion', 1));
-
+    // THEN
+    expect(stack).to(haveResource('AWS::Lambda::LayerVersion', {
+      Metadata: {
+        'aws:asset:path': 'asset.8811a2632ac5564a08fd269e159298f7e497f259578b0dc5e927a1f48ab24d34',
+        'aws:asset:property': 'Content',
+      },
+    }, ResourcePart.CompleteDefinition));
     test.done();
-  }
+  },
 });

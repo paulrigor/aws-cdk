@@ -1,6 +1,6 @@
 /// !cdk-integ *
-import cdk = require('@aws-cdk/cdk');
-import ec2 = require("../lib");
+import * as cdk from '@aws-cdk/core';
+import * as ec2 from '../lib';
 
 const app = new cdk.App();
 
@@ -11,6 +11,11 @@ interface ConstructThatTakesAVpcProps {
 class ConstructThatTakesAVpc extends cdk.Construct {
   constructor(scope: cdk.Construct, id: string, _props: ConstructThatTakesAVpcProps) {
     super(scope, id);
+
+    // new ec2.CfnInstance(this, 'Instance', {
+    //   subnetId: props.vpc.privateSubnets[0].subnetId,
+    //   imageId: new ec2.AmazonLinuxImage().getImage(this).imageId,
+    // });
   }
 }
 
@@ -41,7 +46,7 @@ class Stack2 extends cdk.Stack {
 
     // Pass the VPC to a construct that needs it
     new ConstructThatTakesAVpc(this, 'Construct', {
-      vpc: props.vpc
+      vpc: props.vpc,
     });
   }
 }

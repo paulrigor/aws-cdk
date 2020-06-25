@@ -1,6 +1,6 @@
-import iam = require('@aws-cdk/aws-iam');
-import cdk = require('@aws-cdk/cdk');
-import ec2 = require('../lib');
+import * as iam from '@aws-cdk/aws-iam';
+import * as cdk from '@aws-cdk/core';
+import * as ec2 from '../lib';
 
 const app = new cdk.App();
 
@@ -13,32 +13,32 @@ class VpcEndpointStack extends cdk.Stack {
     const vpc = new ec2.Vpc(this, 'MyVpc', {
       gatewayEndpoints: {
         S3: {
-          service: ec2.GatewayVpcEndpointAwsService.S3
-        }
-      }
+          service: ec2.GatewayVpcEndpointAwsService.S3,
+        },
+      },
     });
 
     // Alternatively gateway endpoints can be added on the VPC
     const dynamoDbEndpoint = vpc.addGatewayEndpoint('DynamoDbEndpoint', {
-      service: ec2.GatewayVpcEndpointAwsService.DynamoDb
+      service: ec2.GatewayVpcEndpointAwsService.DYNAMODB,
     });
 
     // This allows to customize the endpoint policy
     dynamoDbEndpoint.addToPolicy(
-      new iam.PolicyStatement() // Restrict to listing and describing tables
-        .addAnyPrincipal()
-        .addActions('dynamodb:DescribeTable', 'dynamodb:ListTables')
-        .addAllResources()
-    );
+      new iam.PolicyStatement({ // Restrict to listing and describing tables
+        principals: [new iam.AnyPrincipal()],
+        actions: ['dynamodb:DescribeTable', 'dynamodb:ListTables'],
+        resources: ['*'],
+      }));
 
     // Add an interface endpoint
-    const ecrDockerEndpoint = vpc.addInterfaceEndpoint('EcrDockerEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.EcrDocker
-    });
+    vpc.addInterfaceEndpoint('EcrDockerEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
 
-    // When working with an interface endpoint, use the connections object to
-    // allow traffic to flow to the endpoint.
-    ecrDockerEndpoint.connections.allowDefaultPortFromAnyIpv4();
+      // Uncomment the following to allow more fine-grained control over
+      // who can access the endpoint via the '.connections' object.
+      // open: false
+    });
     /// !hide
   }
 }

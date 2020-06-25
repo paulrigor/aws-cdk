@@ -1,11 +1,11 @@
 import '@aws-cdk/assert/jest';
-import autoscaling = require('@aws-cdk/aws-autoscaling');
-import ec2 = require('@aws-cdk/aws-ec2');
-import lambda = require('@aws-cdk/aws-lambda');
-import sns = require('@aws-cdk/aws-sns');
-import sqs = require('@aws-cdk/aws-sqs');
-import { Stack } from '@aws-cdk/cdk';
-import hooks = require('../lib');
+import * as autoscaling from '@aws-cdk/aws-autoscaling';
+import * as ec2 from '@aws-cdk/aws-ec2';
+import * as lambda from '@aws-cdk/aws-lambda';
+import * as sns from '@aws-cdk/aws-sns';
+import * as sqs from '@aws-cdk/aws-sqs';
+import { Stack } from '@aws-cdk/core';
+import * as hooks from '../lib';
 
 describe('given an AutoScalingGroup', () => {
   let stack: Stack;
@@ -28,13 +28,13 @@ describe('given an AutoScalingGroup', () => {
 
     // WHEN
     asg.addLifecycleHook('Trans', {
-      lifecycleTransition: autoscaling.LifecycleTransition.InstanceLaunching,
+      lifecycleTransition: autoscaling.LifecycleTransition.INSTANCE_LAUNCHING,
       notificationTarget: new hooks.QueueHook(queue),
     });
 
     // THEN
     expect(stack).toHaveResource('AWS::AutoScaling::LifecycleHook', {
-      NotificationTargetARN: { "Fn::GetAtt": [ "Queue4A7E3555", "Arn" ] } });
+      NotificationTargetARN: { 'Fn::GetAtt': [ 'Queue4A7E3555', 'Arn' ] } });
   });
 
   test('can use topic as hook target', () => {
@@ -43,38 +43,38 @@ describe('given an AutoScalingGroup', () => {
 
     // WHEN
     asg.addLifecycleHook('Trans', {
-      lifecycleTransition: autoscaling.LifecycleTransition.InstanceLaunching,
+      lifecycleTransition: autoscaling.LifecycleTransition.INSTANCE_LAUNCHING,
       notificationTarget: new hooks.TopicHook(topic),
     });
 
     // THEN
     expect(stack).toHaveResource('AWS::AutoScaling::LifecycleHook', {
-      NotificationTargetARN: { Ref: "TopicBFC7AF6E" }
+      NotificationTargetARN: { Ref: 'TopicBFC7AF6E' },
     });
   });
 
   test('can use Lambda function as hook target', () => {
     // GIVEN
     const fn = new lambda.Function(stack, 'Fn', {
-      code: lambda.Code.inline('foo'),
-      runtime: lambda.Runtime.NodeJS810,
+      code: lambda.Code.fromInline('foo'),
+      runtime: lambda.Runtime.NODEJS_10_X,
       handler: 'index.index',
     });
 
     // WHEN
     asg.addLifecycleHook('Trans', {
-      lifecycleTransition: autoscaling.LifecycleTransition.InstanceLaunching,
+      lifecycleTransition: autoscaling.LifecycleTransition.INSTANCE_LAUNCHING,
       notificationTarget: new hooks.FunctionHook(fn),
     });
 
     // THEN
     expect(stack).toHaveResource('AWS::AutoScaling::LifecycleHook', {
-      NotificationTargetARN: { Ref: "ASGLifecycleHookTransTopic9B0D4842" }
+      NotificationTargetARN: { Ref: 'ASGLifecycleHookTransTopic9B0D4842' },
     });
     expect(stack).toHaveResource('AWS::SNS::Subscription', {
-      Protocol: "lambda",
-      TopicArn: { Ref: "ASGLifecycleHookTransTopic9B0D4842" },
-      Endpoint: { "Fn::GetAtt": [ "Fn9270CBC0", "Arn" ] }
+      Protocol: 'lambda',
+      TopicArn: { Ref: 'ASGLifecycleHookTransTopic9B0D4842' },
+      Endpoint: { 'Fn::GetAtt': [ 'Fn9270CBC0', 'Arn' ] },
     });
   });
 });

@@ -1,13 +1,10 @@
 ## Amazon Simple Queue Service Construct Library
 <!--BEGIN STABILITY BANNER-->
-
 ---
 
-![Stability: Experimental](https://img.shields.io/badge/stability-Experimental-important.svg?style=for-the-badge)
+![cfn-resources: Stable](https://img.shields.io/badge/cfn--resources-stable-success.svg?style=for-the-badge)
 
-> This API is still under active development and subject to non-backward
-> compatible changes or removal in any future version. Use of the API is not recommended in production
-> environments. Experimental APIs are not subject to the Semantic Versioning model.
+![cdk-constructs: Stable](https://img.shields.io/badge/cdk--constructs-stable-success.svg?style=for-the-badge)
 
 ---
 <!--END STABILITY BANNER-->
@@ -24,7 +21,7 @@ without losing messages or requiring other services to be available.
 Import to your project:
 
 ```ts
-import sqs = require('@aws-cdk/aws-sqs');
+import * as sqs from '@aws-cdk/aws-sqs';
 ```
 
 ### Basic usage
@@ -45,14 +42,14 @@ can manage yourself.
 ```ts
 // Use managed key
 new sqs.Queue(this, 'Queue', {
-    encryption: QueueEncryption.Managed,
+    encryption: QueueEncryption.KMS_MANAGED,
 });
 
 // Use custom key
-const myKey = new EncryptionKey(this, 'Key');
+const myKey = new kms.Key(this, 'Key');
 
 new sqs.Queue(this, 'Queue', {
-    encryption: QueueEncryption.Kms,
+    encryption: QueueEncryption.KMS,
     encryptionMasterKey: myKey
 });
 ```

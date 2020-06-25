@@ -1,4 +1,5 @@
-import sfn = require('@aws-cdk/aws-stepfunctions');
+import * as sfn from '@aws-cdk/aws-stepfunctions';
+import { Duration } from '@aws-cdk/core';
 
 /**
  * Properties for FunctionTask
@@ -11,14 +12,13 @@ export interface InvokeActivityProps {
    *
    * @default No heart beat timeout
    */
-  readonly heartbeatSeconds?: number;
+  readonly heartbeat?: Duration;
 }
 
 /**
- * A StepFunctions Task to invoke a Lambda function.
+ * A Step Functions Task to invoke an Activity worker.
  *
- * A Function can be used directly as a Resource, but this class mirrors
- * integration with other AWS services via a specific class instance.
+ * An Activity can be used directly as a Resource.
  */
 export class InvokeActivity implements sfn.IStepFunctionsTask {
   constructor(private readonly activity: sfn.IActivity, private readonly props: InvokeActivityProps = {}) {
@@ -28,7 +28,7 @@ export class InvokeActivity implements sfn.IStepFunctionsTask {
     return {
       resourceArn: this.activity.activityArn,
       metricDimensions: { ActivityArn: this.activity.activityArn },
-      heartbeatSeconds: this.props.heartbeatSeconds,
+      heartbeat: this.props.heartbeat,
       // No IAM permissions necessary, execution role implicitly has Activity permissions.
       metricPrefixSingular: 'Activity',
       metricPrefixPlural: 'Activities',

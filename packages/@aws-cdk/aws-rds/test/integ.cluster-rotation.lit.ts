@@ -1,6 +1,6 @@
-import ec2 = require('@aws-cdk/aws-ec2');
-import cdk = require('@aws-cdk/cdk');
-import rds = require('../lib');
+import * as ec2 from '@aws-cdk/aws-ec2';
+import * as cdk from '@aws-cdk/core';
+import * as rds from '../lib';
 
 const app = new cdk.App();
 const stack = new cdk.Stack(app, 'aws-cdk-rds-cluster-rotation');
@@ -9,17 +9,17 @@ const vpc = new ec2.Vpc(stack, 'VPC');
 
 /// !show
 const cluster = new rds.DatabaseCluster(stack, 'Database', {
-  engine: rds.DatabaseClusterEngine.Aurora,
+  engine: rds.DatabaseClusterEngine.AURORA,
   masterUser: {
-    username: 'admin'
+    username: 'admin',
   },
   instanceProps: {
-    instanceType: new ec2.InstanceTypePair(ec2.InstanceClass.Burstable2, ec2.InstanceSize.Small),
-    vpc
-  }
+    instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE3, ec2.InstanceSize.SMALL),
+    vpc,
+  },
 });
 
-cluster.addRotationSingleUser('Rotation');
+cluster.addRotationSingleUser();
 /// !hide
 
 app.synth();

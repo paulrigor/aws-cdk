@@ -18,7 +18,10 @@
                 "kms:Get*",
                 "kms:Delete*",
                 "kms:ScheduleKeyDeletion",
-                "kms:CancelKeyDeletion"
+                "kms:CancelKeyDeletion",
+                "kms:GenerateDataKey",
+                "kms:TagResource",
+                "kms:UntagResource"
               ],
               "Effect": "Allow",
               "Principal": {
@@ -59,12 +62,30 @@
                 }
               },
               "Resource": "*"
+            },
+            {
+              "Action": [
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "PipelineSourceCodePipelineActionRoleC6F9E7F5",
+                    "Arn"
+                  ]
+                }
+              },
+              "Resource": "*"
             }
           ],
           "Version": "2012-10-17"
         }
       },
-      "DeletionPolicy": "Retain"
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
     },
     "PipelineArtifactsBucket22248F97": {
       "Type": "AWS::S3::Bucket",
@@ -83,9 +104,30 @@
               }
             }
           ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
         }
       },
+      "UpdateReplacePolicy": "Retain",
       "DeletionPolicy": "Retain"
+    },
+    "PipelineArtifactsBucketEncryptionKeyAlias5C510EEE": {
+      "Type": "AWS::KMS::Alias",
+      "Properties": {
+        "AliasName": "alias/codepipeline-awscdkcodepipelinelambdapipeline87a4b3d3",
+        "TargetKeyId": {
+          "Fn::GetAtt": [
+            "PipelineArtifactsBucketEncryptionKey01D58D69",
+            "Arn"
+          ]
+        }
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
     },
     "PipelineRoleD68726F7": {
       "Type": "AWS::IAM::Role",
@@ -96,17 +138,7 @@
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": {
-                "Service": {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "codepipeline.",
-                      {
-                        "Ref": "AWS::URLSuffix"
-                      }
-                    ]
-                  ]
-                }
+                "Service": "codepipeline.amazonaws.com"
               }
             }
           ],
@@ -169,46 +201,21 @@
               }
             },
             {
-              "Action": [
-                "s3:GetObject*",
-                "s3:GetBucket*",
-                "s3:List*"
-              ],
-              "Effect": "Allow",
-              "Resource": [
-                {
-                  "Fn::GetAtt": [
-                    "PipelineBucketB967BD35",
-                    "Arn"
-                  ]
-                },
-                {
-                  "Fn::Join": [
-                    "",
-                    [
-                      {
-                        "Fn::GetAtt": [
-                          "PipelineBucketB967BD35",
-                          "Arn"
-                        ]
-                      },
-                      "/*"
-                    ]
-                  ]
-                }
-              ]
-            },
-            {
-              "Action": "lambda:ListFunctions",
-              "Effect": "Allow",
-              "Resource": "*"
-            },
-            {
-              "Action": "lambda:InvokeFunction",
+              "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Resource": {
                 "Fn::GetAtt": [
-                  "LambdaFun98622869",
+                  "PipelineSourceCodePipelineActionRoleC6F9E7F5",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "PipelineLambdaCodePipelineActionRoleC6032822",
                   "Arn"
                 ]
               }
@@ -250,13 +257,18 @@
                   "S3ObjectKey": "key",
                   "PollForSourceChanges": false
                 },
-                "InputArtifacts": [],
                 "Name": "Source",
                 "OutputArtifacts": [
                   {
                     "Name": "SourceArtifact"
                   }
                 ],
+                "RoleArn": {
+                  "Fn::GetAtt": [
+                    "PipelineSourceCodePipelineActionRoleC6F9E7F5",
+                    "Arn"
+                  ]
+                },
                 "RunOrder": 1
               }
             ],
@@ -276,9 +288,13 @@
                     "Ref": "LambdaFun98622869"
                   }
                 },
-                "InputArtifacts": [],
                 "Name": "Lambda",
-                "OutputArtifacts": [],
+                "RoleArn": {
+                  "Fn::GetAtt": [
+                    "PipelineLambdaCodePipelineActionRoleC6032822",
+                    "Arn"
+                  ]
+                },
                 "RunOrder": 1
               }
             ],
@@ -306,6 +322,128 @@
         "PipelineRoleD68726F7"
       ]
     },
+    "PipelineSourceCodePipelineActionRoleC6F9E7F5": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":root"
+                    ]
+                  ]
+                }
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "PipelineSourceCodePipelineActionRoleDefaultPolicy2D565925": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "PipelineBucketB967BD35",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "PipelineBucketB967BD35",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "s3:DeleteObject*",
+                "s3:PutObject*",
+                "s3:Abort*"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "PipelineArtifactsBucket22248F97",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "PipelineArtifactsBucket22248F97",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "PipelineArtifactsBucketEncryptionKey01D58D69",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "PipelineSourceCodePipelineActionRoleDefaultPolicy2D565925",
+        "Roles": [
+          {
+            "Ref": "PipelineSourceCodePipelineActionRoleC6F9E7F5"
+          }
+        ]
+      }
+    },
     "PipelineEventsRole46BEEA7C": {
       "Type": "AWS::IAM::Role",
       "Properties": {
@@ -315,17 +453,7 @@
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": {
-                "Service": {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "events.",
-                      {
-                        "Ref": "AWS::URLSuffix"
-                      }
-                    ]
-                  ]
-                }
+                "Service": "events.amazonaws.com"
               }
             }
           ],
@@ -376,15 +504,80 @@
         ]
       }
     },
+    "PipelineLambdaCodePipelineActionRoleC6032822": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "AWS::AccountId"
+                      },
+                      ":root"
+                    ]
+                  ]
+                }
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      }
+    },
+    "PipelineLambdaCodePipelineActionRoleDefaultPolicyFEE90F93": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:ListFunctions",
+              "Effect": "Allow",
+              "Resource": "*"
+            },
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "LambdaFun98622869",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "PipelineLambdaCodePipelineActionRoleDefaultPolicyFEE90F93",
+        "Roles": [
+          {
+            "Ref": "PipelineLambdaCodePipelineActionRoleC6032822"
+          }
+        ]
+      }
+    },
     "PipelineBucketB967BD35": {
       "Type": "AWS::S3::Bucket",
       "Properties": {
         "VersioningConfiguration": {
           "Status": "Enabled"
         }
-      }
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete"
     },
-    "PipelineBucketawscdkcodepipelinelambdaPipeline87A4B3D3SourceEventRuleCE4D4505": {
+    "PipelineBucketawscdkcodepipelinelambdaPipeline87A4B3D3SourceEventRulekey23D3C004": {
       "Type": "AWS::Events::Rule",
       "Properties": {
         "EventPattern": {
@@ -395,9 +588,6 @@
             "AWS API Call via CloudTrail"
           ],
           "detail": {
-            "eventName": [
-              "PutObject"
-            ],
             "resources": {
               "ARN": [
                 {
@@ -414,6 +604,21 @@
                     ]
                   ]
                 }
+              ]
+            },
+            "eventName": [
+              "CompleteMultipartUpload",
+              "CopyObject",
+              "PutObject"
+            ],
+            "requestParameters": {
+              "bucketName": [
+                {
+                  "Ref": "PipelineBucketB967BD35"
+                }
+              ],
+              "key": [
+                "key"
               ]
             }
           }
@@ -444,7 +649,7 @@
                 ]
               ]
             },
-            "Id": "Pipeline",
+            "Id": "Target0",
             "RoleArn": {
               "Fn::GetAtt": [
                 "PipelineEventsRole46BEEA7C",
@@ -457,6 +662,7 @@
     },
     "CloudTrailS310CD22F2": {
       "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Retain",
       "DeletionPolicy": "Retain"
     },
     "CloudTrailS3PolicyEA49A03E": {
@@ -471,17 +677,7 @@
               "Action": "s3:GetBucketAcl",
               "Effect": "Allow",
               "Principal": {
-                "Service": {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "cloudtrail.",
-                      {
-                        "Ref": "AWS::URLSuffix"
-                      }
-                    ]
-                  ]
-                }
+                "Service": "cloudtrail.amazonaws.com"
               },
               "Resource": {
                 "Fn::GetAtt": [
@@ -499,17 +695,7 @@
               },
               "Effect": "Allow",
               "Principal": {
-                "Service": {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "cloudtrail.",
-                      {
-                        "Ref": "AWS::URLSuffix"
-                      }
-                    ]
-                  ]
-                }
+                "Service": "cloudtrail.amazonaws.com"
               },
               "Resource": {
                 "Fn::Join": [
@@ -586,17 +772,7 @@
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": {
-                "Service": {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "lambda.",
-                      {
-                        "Ref": "AWS::URLSuffix"
-                      }
-                    ]
-                  ]
-                }
+                "Service": "lambda.amazonaws.com"
               }
             }
           ],
@@ -655,7 +831,7 @@
             "Arn"
           ]
         },
-        "Runtime": "nodejs8.10"
+        "Runtime": "nodejs10.x"
       },
       "DependsOn": [
         "LambdaFunServiceRoleDefaultPolicy217FED83",

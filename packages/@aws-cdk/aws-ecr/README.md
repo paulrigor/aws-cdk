@@ -1,13 +1,10 @@
 ## Amazon ECR Construct Library
 <!--BEGIN STABILITY BANNER-->
-
 ---
 
-![Stability: Experimental](https://img.shields.io/badge/stability-Experimental-important.svg?style=for-the-badge)
+![cfn-resources: Stable](https://img.shields.io/badge/cfn--resources-stable-success.svg?style=for-the-badge)
 
-> This API is still under active development and subject to non-backward
-> compatible changes or removal in any future version. Use of the API is not recommended in production
-> environments. Experimental APIs are not subject to the Semantic Versioning model.
+![cdk-constructs: Stable](https://img.shields.io/badge/cdk--constructs-stable-success.svg?style=for-the-badge)
 
 ---
 <!--END STABILITY BANNER-->
@@ -23,6 +20,24 @@ holds multiple verions of a single container image.
 const repository = new ecr.Repository(this, 'Repository');
 ```
 
+### Image scanning
+
+Amazon ECR image scanning helps in identifying software vulnerabilities in your container images. You can manually scan container images stored in Amazon ECR, or you can configure your repositories to scan images when you push them to a repository. To create a new reposity to scan on push, simply enable `imageScanOnPush` in the properties
+
+```ts
+const repository = new ecr.Repository(stack, 'Repo', {
+  imageScanOnPush: true
+});
+```
+
+To create an `onImageScanCompleted` event rule and trigger the event target
+
+```ts
+repository.onImageScanCompleted('ImageScanComplete')
+  .addTarget(...)
+```
+
+
 ### Automatically clean up repositories
 
 You can set life cycle rules to automatically clean up old images from your
@@ -33,5 +48,5 @@ is important here):
 
 ```ts
 repository.addLifecycleRule({ tagPrefixList: ['prod'], maxImageCount: 9999 });
-repository.addLifecycleRule({ maxImageAgeDays: 30 });
+repository.addLifecycleRule({ maxImageAge: cdk.Duration.days(30) });
 ```

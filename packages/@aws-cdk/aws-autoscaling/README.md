@@ -1,18 +1,15 @@
 ## Amazon EC2 Auto Scaling Construct Library
 <!--BEGIN STABILITY BANNER-->
-
 ---
 
-![Stability: Experimental](https://img.shields.io/badge/stability-Experimental-important.svg?style=for-the-badge)
+![cfn-resources: Stable](https://img.shields.io/badge/cfn--resources-stable-success.svg?style=for-the-badge)
 
-> This API is still under active development and subject to non-backward
-> compatible changes or removal in any future version. Use of the API is not recommended in production
-> environments. Experimental APIs are not subject to the Semantic Versioning model.
+![cdk-constructs: Stable](https://img.shields.io/badge/cdk--constructs-stable-success.svg?style=for-the-badge)
 
 ---
 <!--END STABILITY BANNER-->
 
-This module is part of the [AWS Cloud Development Kit](https://github.com/awslabs/aws-cdk) project.
+This module is part of the [AWS Cloud Development Kit](https://github.com/aws/aws-cdk) project.
 
 ### Fleet
 
@@ -22,13 +19,13 @@ An `AutoScalingGroup` represents a number of instances on which you run your cod
 pick the size of the fleet, the instance type and the OS image:
 
 ```ts
-import autoscaling = require('@aws-cdk/aws-autoscaling');
-import ec2 = require('@aws-cdk/aws-ec2');
+import * as autoscaling from '@aws-cdk/aws-autoscaling';
+import * as ec2 from '@aws-cdk/aws-ec2';
 
 new autoscaling.AutoScalingGroup(this, 'ASG', {
-    vpc,
-    instanceType: new ec2.InstanceTypePair(InstanceClass.Burstable2, InstanceSize.Micro),
-    machineImage: new ec2.AmazonLinuxImage() // get the latest Amazon Linux image
+  vpc,
+  instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.MICRO),
+  machineImage: new ec2.AmazonLinuxImage() // get the latest Amazon Linux image
 });
 ```
 
@@ -136,9 +133,9 @@ capacity.scaleOnMetric('ScaleToCPU', {
     { lower: 70, change: +3 },
   ],
 
-  // Change this to AdjustmentType.PercentChangeInCapacity to interpret the
+  // Change this to AdjustmentType.PERCENT_CHANGE_IN_CAPACITY to interpret the
   // 'change' numbers before as percentages instead of capacity counts.
-  adjustmentType: autoscaling.AdjustmentType.ChangeInCapacity,
+  adjustmentType: autoscaling.AdjustmentType.CHANGE_IN_CAPACITY,
 });
 ```
 
@@ -199,20 +196,19 @@ AutoScalingGroup, and so can be used for two purposes:
   the range they can scale over (by setting both `minCapacity` and
   `maxCapacity` but changing their range over time).
 
-A schedule is expressed as a cron expression. There is a `Cron` helper class
-to help build cron expressions.
+A schedule is expressed as a cron expression. The `Schedule` class has a `cron` method to help build cron expressions.
 
 The following example scales the fleet out in the morning, going back to natural
 scaling (all the way down to 1 instance if necessary) at night:
 
 ```ts
 autoScalingGroup.scaleOnSchedule('PrescaleInTheMorning', {
-  schedule: autoscaling.Cron.dailyUtc(8),
+  schedule: autoscaling.Schedule.cron({ hour: '8', minute: '0' }),
   minCapacity: 20,
 });
 
 autoScalingGroup.scaleOnSchedule('AllowDownscalingAtNight', {
-  schedule: autoscaling.Cron.dailyUtc(20),
+  schedule: autoscaling.Schedule.cron({ hour: '20', minute: '0' }),
   minCapacity: 1
 });
 ```
@@ -221,6 +217,19 @@ autoScalingGroup.scaleOnSchedule('AllowDownscalingAtNight', {
 
 See the documentation of the `@aws-cdk/aws-ec2` package for more information
 about allowing connections between resources backed by instances.
+
+### Max Instance Lifetime
+
+To enable the max instance lifetime support, specify `maxInstanceLifetime` property
+for the `AutoscalingGroup` resource. The value must be between 7 and 365 days(inclusive).
+To clear a previously set value, just leave this property undefinied.
+
+### Instance Monitoring
+
+To disable detailed instance monitoring, specify `instanceMonitoring` property
+for the `AutoscalingGroup` resource as `Monitoring.BASIC`. Otherwise detailed monitoring
+will be enabled.
+
 
 ### Future work
 

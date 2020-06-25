@@ -1,8 +1,9 @@
-import events = require('@aws-cdk/aws-events');
-import iam = require('@aws-cdk/aws-iam');
-import { Construct, DeletionPolicy, IConstruct, IResource, Resource, Stack, Token } from '@aws-cdk/cdk';
+import * as events from '@aws-cdk/aws-events';
+import * as iam from '@aws-cdk/aws-iam';
+import { Construct, IConstruct, IResource, Lazy, RemovalPolicy, Resource, Stack, Token } from '@aws-cdk/core';
+import * as cr from '@aws-cdk/custom-resources';
 import { CfnRepository } from './ecr.generated';
-import { CountType, LifecycleRule, TagStatus } from './lifecycle';
+import { LifecycleRule, TagStatus } from './lifecycle';
 
 /**
  * Represents an ECR repository.
@@ -41,7 +42,7 @@ export interface IRepository extends IResource {
   /**
    * Add a policy statement to the repository's resource policy
    */
-  addToResourcePolicy(statement: iam.PolicyStatement): void;
+  addToResourcePolicy(statement: iam.PolicyStatement): iam.AddToResourcePolicyResult;
 
   /**
    * Grant the given principal identity permissions to perform the actions on this repository
@@ -67,7 +68,7 @@ export interface IRepository extends IResource {
    * @param id The id of the rule
    * @param options Options for adding the rule
    */
-  onCloudTrailEvent(id: string, options: events.OnEventOptions): events.Rule;
+  onCloudTrailEvent(id: string, options?: events.OnEventOptions): events.Rule;
 
   /**
    * Defines an AWS CloudWatch event rule that can trigger a target when an image is pushed to this
@@ -79,7 +80,22 @@ export interface IRepository extends IResource {
    * @param id The id of the rule
    * @param options Options for adding the rule
    */
-  onCloudTrailImagePushed(id: string, options: OnCloudTrailImagePushedOptions): events.Rule;
+  onCloudTrailImagePushed(id: string, options?: OnCloudTrailImagePushedOptions): events.Rule;
+
+  /**
+   * Defines an AWS CloudWatch event rule that can trigger a target when the image scan is completed
+   *
+   *
+   * @param id The id of the rule
+   * @param options Options for adding the rule
+   */
+  onImageScanCompleted(id: string, options?: OnImageScanCompletedOptions): events.Rule;
+
+  /**
+   * Defines a CloudWatch event rule which triggers for repository events. Use
+   * `rule.addEventPattern(pattern)` to specify a filter.
+   */
+  onEvent(id: string, options?: events.OnEventOptions): events.Rule;
 }
 
 /**
@@ -99,7 +115,7 @@ export abstract class RepositoryBase extends Resource implements IRepository {
   /**
    * Add a policy statement to the repository's resource policy
    */
-  public abstract addToResourcePolicy(statement: iam.PolicyStatement): void;
+  public abstract addToResourcePolicy(statement: iam.PolicyStatement): iam.AddToResourcePolicyResult;
 
   /**
    * The URI of this repository (represents the latest image):
@@ -120,8 +136,8 @@ export abstract class RepositoryBase extends Resource implements IRepository {
    */
   public repositoryUriForTag(tag?: string): string {
     const tagSuffix = tag ? `:${tag}` : '';
-    const parts = Stack.of(this).parseArn(this.repositoryArn);
-    return `${parts.account}.dkr.ecr.${parts.region}.amazonaws.com/${this.repositoryName}${tagSuffix}`;
+    const parts = this.stack.parseArn(this.repositoryArn);
+    return `${parts.account}.dkr.ecr.${parts.region}.${this.stack.urlSuffix}/${this.repositoryName}${tagSuffix}`;
   }
 
   /**
@@ -133,7 +149,7 @@ export abstract class RepositoryBase extends Resource implements IRepository {
    * @param id The id of the rule
    * @param options Options for adding the rule
    */
-  public onCloudTrailEvent(id: string, options: events.OnEventOptions): events.Rule {
+  public onCloudTrailEvent(id: string, options: events.OnEventOptions = {}): events.Rule {
     const rule = new events.Rule(this, id, options);
     rule.addTarget(options.target);
     rule.addEventPattern({
@@ -142,8 +158,8 @@ export abstract class RepositoryBase extends Resource implements IRepository {
       detail: {
         requestParameters: {
           repositoryName: [this.repositoryName],
-        }
-      }
+        },
+      },
     });
     return rule;
   }
@@ -158,7 +174,7 @@ export abstract class RepositoryBase extends Resource implements IRepository {
    * @param id The id of the rule
    * @param options Options for adding the rule
    */
-  public onCloudTrailImagePushed(id: string, options: OnCloudTrailImagePushedOptions): events.Rule {
+  public onCloudTrailImagePushed(id: string, options: OnCloudTrailImagePushedOptions = {}): events.Rule {
     const rule = this.onCloudTrailEvent(id, options);
     rule.addEventPattern({
       detail: {
@@ -170,7 +186,41 @@ export abstract class RepositoryBase extends Resource implements IRepository {
     });
     return rule;
   }
+  /**
+   * Defines an AWS CloudWatch event rule that can trigger a target when an image scan is completed
+   *
+   *
+   * @param id The id of the rule
+   * @param options Options for adding the rule
+   */
+  public onImageScanCompleted(id: string, options: OnImageScanCompletedOptions = {}): events.Rule {
+    const rule = new events.Rule(this, id, options);
+    rule.addTarget(options.target);
+    rule.addEventPattern({
+      source: ['aws.ecr'],
+      detailType: ['ECR Image Scan'],
+      detail: {
+        'repository-name': [this.repositoryName],
+        'scan-status': ['COMPLETE'],
+        'image-tags': options.imageTags ? options.imageTags : undefined,
+      },
+    });
+    return rule;
+  }
 
+  /**
+   * Defines a CloudWatch event rule which triggers for repository events. Use
+   * `rule.addEventPattern(pattern)` to specify a filter.
+   */
+  public onEvent(id: string, options: events.OnEventOptions = {}) {
+    const rule = new events.Rule(this, id, options);
+    rule.addEventPattern({
+      source: ['aws.ecr'],
+      resources: [this.repositoryArn],
+    });
+    rule.addTarget(options.target);
+    return rule;
+  }
   /**
    * Grant the given principal identity permissions to perform the actions on this repository
    */
@@ -179,6 +229,7 @@ export abstract class RepositoryBase extends Resource implements IRepository {
       grantee,
       actions,
       resourceArns: [this.repositoryArn],
+      resourceSelfArns: [],
       resource: this,
     });
   }
@@ -187,11 +238,11 @@ export abstract class RepositoryBase extends Resource implements IRepository {
    * Grant the given identity permissions to use the images in this repository
    */
   public grantPull(grantee: iam.IGrantable) {
-    const ret = this.grant(grantee, "ecr:BatchCheckLayerAvailability", "ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage");
+    const ret = this.grant(grantee, 'ecr:BatchCheckLayerAvailability', 'ecr:GetDownloadUrlForLayer', 'ecr:BatchGetImage');
 
     iam.Grant.addToPrincipal({
       grantee,
-      actions: ["ecr:GetAuthorizationToken"],
+      actions: ['ecr:GetAuthorizationToken'],
       resourceArns: ['*'],
       scope: this,
     });
@@ -205,10 +256,10 @@ export abstract class RepositoryBase extends Resource implements IRepository {
   public grantPullPush(grantee: iam.IGrantable) {
     this.grantPull(grantee);
     return this.grant(grantee,
-      "ecr:PutImage",
-      "ecr:InitiateLayerUpload",
-      "ecr:UploadLayerPart",
-      "ecr:CompleteLayerUpload");
+      'ecr:PutImage',
+      'ecr:InitiateLayerUpload',
+      'ecr:UploadLayerPart',
+      'ecr:CompleteLayerUpload');
   }
 }
 
@@ -222,6 +273,19 @@ export interface OnCloudTrailImagePushedOptions extends events.OnEventOptions {
    * @default - Watch changes to all tags
    */
   readonly imageTag?: string;
+}
+
+/**
+ * Options for the OnImageScanCompleted method
+ */
+export interface OnImageScanCompletedOptions extends events.OnEventOptions {
+  /**
+   * Only watch changes to the image tags spedified.
+   * Leave it undefined to watch the full repository.
+   *
+   * @default - Watch the changes to the repository with all image tags
+   */
+  readonly imageTags?: string[];
 }
 
 export interface RepositoryProps {
@@ -248,14 +312,18 @@ export interface RepositoryProps {
   readonly lifecycleRegistryId?: string;
 
   /**
-   * Retain the repository on stack deletion
+   * Determine what happens to the repository when the resource/stack is deleted.
    *
-   * If you don't set this to true, the registry must be empty, otherwise
-   * your stack deletion will fail.
-   *
-   * @default false
+   * @default RemovalPolicy.Retain
    */
-  readonly retain?: boolean;
+  readonly removalPolicy?: RemovalPolicy;
+
+  /**
+   * Enable the scan on push when creating the repository
+   *
+   *  @default false
+   */
+  readonly imageScanOnPush?: boolean;
 }
 
 export interface RepositoryAttributes {
@@ -275,8 +343,9 @@ export class Repository extends RepositoryBase {
       public readonly repositoryName = attrs.repositoryName;
       public readonly repositoryArn = attrs.repositoryArn;
 
-      public addToResourcePolicy(_statement: iam.PolicyStatement) {
+      public addToResourcePolicy(_statement: iam.PolicyStatement): iam.AddToResourcePolicyResult {
         // dropped
+        return { statementAdded: false };
       }
     }
 
@@ -288,7 +357,7 @@ export class Repository extends RepositoryBase {
     // if repositoryArn is a token, the repository name is also required. this is because
     // repository names can include "/" (e.g. foo/bar/myrepo) and it is impossible to
     // parse the name from an ARN using CloudFormation's split/select.
-    if (Token.isToken(repositoryArn)) {
+    if (Token.isUnresolved(repositoryArn)) {
       throw new Error('"repositoryArn" is a late-bound value, and therefore "repositoryName" is required. Use `fromRepositoryAttributes` instead');
     }
 
@@ -298,8 +367,9 @@ export class Repository extends RepositoryBase {
       public repositoryName = repositoryName;
       public repositoryArn = repositoryArn;
 
-      public addToResourcePolicy(_statement: iam.PolicyStatement): void {
+      public addToResourcePolicy(_statement: iam.PolicyStatement): iam.AddToResourcePolicyResult {
         // dropped
+        return { statementAdded: false };
       }
     }
 
@@ -311,8 +381,9 @@ export class Repository extends RepositoryBase {
       public repositoryName = repositoryName;
       public repositoryArn = Repository.arnForLocalRepository(repositoryName, scope);
 
-      public addToResourcePolicy(_statement: iam.PolicyStatement): void {
+      public addToResourcePolicy(_statement: iam.PolicyStatement): iam.AddToResourcePolicyResult  {
         // dropped
+        return { statementAdded: false };
       }
     }
 
@@ -327,7 +398,7 @@ export class Repository extends RepositoryBase {
     return Stack.of(scope).formatArn({
       service: 'ecr',
       resource: 'repository',
-      resourceName: repositoryName
+      resourceName: repositoryName,
     });
   }
 
@@ -338,33 +409,68 @@ export class Repository extends RepositoryBase {
   private policyDocument?: iam.PolicyDocument;
 
   constructor(scope: Construct, id: string, props: RepositoryProps = {}) {
-    super(scope, id);
-
-    const resource = new CfnRepository(this, 'Resource', {
-      repositoryName: props.repositoryName,
-      // It says "Text", but they actually mean "Object".
-      repositoryPolicyText: new Token(() => this.policyDocument),
-      lifecyclePolicy: new Token(() => this.renderLifecyclePolicy()),
+    super(scope, id, {
+      physicalName: props.repositoryName,
     });
 
-    if (props.retain) {
-      resource.options.deletionPolicy = DeletionPolicy.Retain;
-    }
+    const resource = new CfnRepository(this, 'Resource', {
+      repositoryName: this.physicalName,
+      // It says "Text", but they actually mean "Object".
+      repositoryPolicyText: Lazy.anyValue({ produce: () => this.policyDocument }),
+      lifecyclePolicy: Lazy.anyValue({ produce: () => this.renderLifecyclePolicy() }),
+    });
+
+    resource.applyRemovalPolicy(props.removalPolicy);
 
     this.registryId = props.lifecycleRegistryId;
     if (props.lifecycleRules) {
       props.lifecycleRules.forEach(this.addLifecycleRule.bind(this));
     }
 
-    this.repositoryName = resource.repositoryName;
-    this.repositoryArn = resource.repositoryArn;
+    this.repositoryName = this.getResourceNameAttribute(resource.ref);
+    this.repositoryArn = this.getResourceArnAttribute(resource.attrArn, {
+      service: 'ecr',
+      resource: 'repository',
+      resourceName: this.physicalName,
+    });
+
+    // image scanOnPush
+    if (props.imageScanOnPush) {
+      new cr.AwsCustomResource(this, 'ImageScanOnPush', {
+        resourceType: 'Custom::ECRImageScanOnPush',
+        onUpdate: {
+          service: 'ECR',
+          action: 'putImageScanningConfiguration',
+          parameters: {
+            repositoryName: this.repositoryName,
+            imageScanningConfiguration: {
+              scanOnPush: props.imageScanOnPush,
+            },
+          },
+          physicalResourceId: cr.PhysicalResourceId.of(this.repositoryArn),
+        },
+        onDelete: {
+          service: 'ECR',
+          action: 'putImageScanningConfiguration',
+          parameters: {
+            repositoryName: this.repositoryName,
+            imageScanningConfiguration: {
+              scanOnPush: false,
+            },
+          },
+          physicalResourceId: cr.PhysicalResourceId.of(this.repositoryArn),
+        },
+        policy: cr.AwsCustomResourcePolicy.fromSdkCalls({ resources: [ this.repositoryArn ] }),
+      });
+    }
   }
 
-  public addToResourcePolicy(statement: iam.PolicyStatement) {
+  public addToResourcePolicy(statement: iam.PolicyStatement): iam.AddToResourcePolicyResult {
     if (this.policyDocument === undefined) {
       this.policyDocument = new iam.PolicyDocument();
     }
-    this.policyDocument.addStatement(statement);
+    this.policyDocument.addStatements(statement);
+    return { statementAdded: false, policyDependable: this.policyDocument };
   }
 
   /**
@@ -376,20 +482,20 @@ export class Repository extends RepositoryBase {
   public addLifecycleRule(rule: LifecycleRule) {
     // Validate rule here so users get errors at the expected location
     if (rule.tagStatus === undefined) {
-      rule = { ...rule, tagStatus: rule.tagPrefixList === undefined ? TagStatus.Any : TagStatus.Tagged };
+      rule = { ...rule, tagStatus: rule.tagPrefixList === undefined ? TagStatus.ANY : TagStatus.TAGGED };
     }
 
-    if (rule.tagStatus === TagStatus.Tagged && (rule.tagPrefixList === undefined || rule.tagPrefixList.length === 0)) {
+    if (rule.tagStatus === TagStatus.TAGGED && (rule.tagPrefixList === undefined || rule.tagPrefixList.length === 0)) {
       throw new Error('TagStatus.Tagged requires the specification of a tagPrefixList');
     }
-    if (rule.tagStatus !== TagStatus.Tagged && rule.tagPrefixList !== undefined) {
+    if (rule.tagStatus !== TagStatus.TAGGED && rule.tagPrefixList !== undefined) {
       throw new Error('tagPrefixList can only be specified when tagStatus is set to Tagged');
     }
-    if ((rule.maxImageAgeDays !== undefined) === (rule.maxImageCount !== undefined)) {
-      throw new Error(`Life cycle rule must contain exactly one of 'maxImageAgeDays' and 'maxImageCount', got: ${JSON.stringify(rule)}`);
+    if ((rule.maxImageAge !== undefined) === (rule.maxImageCount !== undefined)) {
+      throw new Error(`Life cycle rule must contain exactly one of 'maxImageAge' and 'maxImageCount', got: ${JSON.stringify(rule)}`);
     }
 
-    if (rule.tagStatus === TagStatus.Any && this.lifecycleRules.filter(r => r.tagStatus === TagStatus.Any).length > 0) {
+    if (rule.tagStatus === TagStatus.ANY && this.lifecycleRules.filter(r => r.tagStatus === TagStatus.ANY).length > 0) {
       throw new Error('Life cycle can only have one TagStatus.Any rule');
     }
 
@@ -425,9 +531,9 @@ export class Repository extends RepositoryBase {
   private orderedLifecycleRules(): LifecycleRule[] {
     if (this.lifecycleRules.length === 0) { return []; }
 
-    const prioritizedRules = this.lifecycleRules.filter(r => r.rulePriority !== undefined && r.tagStatus !== TagStatus.Any);
-    const autoPrioritizedRules = this.lifecycleRules.filter(r => r.rulePriority === undefined && r.tagStatus !== TagStatus.Any);
-    const anyRules = this.lifecycleRules.filter(r => r.tagStatus === TagStatus.Any);
+    const prioritizedRules = this.lifecycleRules.filter(r => r.rulePriority !== undefined && r.tagStatus !== TagStatus.ANY);
+    const autoPrioritizedRules = this.lifecycleRules.filter(r => r.rulePriority === undefined && r.tagStatus !== TagStatus.ANY);
+    const anyRules = this.lifecycleRules.filter(r => r.tagStatus === TagStatus.ANY);
     if (anyRules.length > 0 && anyRules[0].rulePriority !== undefined && autoPrioritizedRules.length > 0) {
       // Supporting this is too complex for very little value. We just prohibit it.
       throw new Error("Cannot combine prioritized TagStatus.Any rule with unprioritized rules. Remove rulePriority from the 'Any' rule.");
@@ -440,7 +546,7 @@ export class Repository extends RepositoryBase {
     for (const rule of prioritizedRules.concat(autoPrioritizedRules).concat(anyRules)) {
       ret.push({
         ...rule,
-        rulePriority: rule.rulePriority !== undefined ? rule.rulePriority : autoPrio++
+        rulePriority: rule.rulePriority !== undefined ? rule.rulePriority : autoPrio++,
       });
     }
 
@@ -451,7 +557,7 @@ export class Repository extends RepositoryBase {
 }
 
 function validateAnyRuleLast(rules: LifecycleRule[]) {
-  const anyRules = rules.filter(r => r.tagStatus === TagStatus.Any);
+  const anyRules = rules.filter(r => r.tagStatus === TagStatus.ANY);
   if (anyRules.length === 1) {
     const maxPrio = Math.max(...rules.map(r => r.rulePriority!));
     if (anyRules[0].rulePriority !== maxPrio) {
@@ -468,14 +574,29 @@ function renderLifecycleRule(rule: LifecycleRule) {
     rulePriority: rule.rulePriority,
     description: rule.description,
     selection: {
-      tagStatus: rule.tagStatus || TagStatus.Any,
+      tagStatus: rule.tagStatus || TagStatus.ANY,
       tagPrefixList: rule.tagPrefixList,
-      countType: rule.maxImageAgeDays !== undefined ? CountType.SinceImagePushed : CountType.ImageCountMoreThan,
-      countNumber: rule.maxImageAgeDays !== undefined ? rule.maxImageAgeDays : rule.maxImageCount,
-      countUnit: rule.maxImageAgeDays !== undefined ? 'days' : undefined,
+      countType: rule.maxImageAge !== undefined ? CountType.SINCE_IMAGE_PUSHED : CountType.IMAGE_COUNT_MORE_THAN,
+      countNumber: rule.maxImageAge !== undefined ? rule.maxImageAge.toDays() : rule.maxImageCount,
+      countUnit: rule.maxImageAge !== undefined ? 'days' : undefined,
     },
     action: {
-      type: 'expire'
-    }
+      type: 'expire',
+    },
   };
+}
+
+/**
+ * Select images based on counts
+ */
+const enum CountType {
+  /**
+   * Set a limit on the number of images in your repository
+   */
+  IMAGE_COUNT_MORE_THAN = 'imageCountMoreThan',
+
+  /**
+   * Set an age limit on the images in your repository
+   */
+  SINCE_IMAGE_PUSHED = 'sinceImagePushed',
 }

@@ -4,23 +4,22 @@
 // to the very lowest level to create CloudFormation resources by hand, without even generated
 // library support.
 
-import cdk = require('@aws-cdk/cdk');
-import cloudwatch = require('../lib');
-import { PeriodOverride } from '../lib';
+import * as cdk from '@aws-cdk/core';
+import * as cloudwatch from '../lib';
 
 const app = new cdk.App();
 
-const stack = new cdk.Stack(app, `aws-cdk-cloudwatch`);
+const stack = new cdk.Stack(app, 'aws-cdk-cloudwatch');
 
 const queue = new cdk.CfnResource(stack, 'queue', { type: 'AWS::SQS::Queue' });
 
 const metric = new cloudwatch.Metric({
   namespace: 'AWS/SQS',
   metricName: 'ApproximateNumberOfMessagesVisible',
-  dimensions: { QueueName: queue.getAtt('QueueName') }
+  dimensions: { QueueName: queue.getAtt('QueueName') },
 });
 
-const alarm = metric.newAlarm(stack, 'Alarm', {
+const alarm = metric.createAlarm(stack, 'Alarm', {
   threshold: 100,
   evaluationPeriods: 3,
   datapointsToAlarm: 2,
@@ -30,24 +29,30 @@ const dashboard = new cloudwatch.Dashboard(stack, 'Dash', {
   dashboardName: 'MyCustomDashboardName',
   start: '-9H',
   end: '2018-12-17T06:00:00.000Z',
-  periodOverride: PeriodOverride.Inherit
+  periodOverride: cloudwatch.PeriodOverride.INHERIT,
 });
-dashboard.add(
+dashboard.addWidgets(
   new cloudwatch.TextWidget({ markdown: '# This is my dashboard' }),
   new cloudwatch.TextWidget({ markdown: 'you like?' }),
 );
-dashboard.add(new cloudwatch.AlarmWidget({
+dashboard.addWidgets(new cloudwatch.AlarmWidget({
   title: 'Messages in queue',
   alarm,
 }));
-dashboard.add(new cloudwatch.GraphWidget({
+dashboard.addWidgets(new cloudwatch.GraphWidget({
   title: 'More messages in queue with alarm annotation',
   left: [metric],
-  leftAnnotations: [alarm.toAnnotation()]
+  leftAnnotations: [alarm.toAnnotation()],
 }));
-dashboard.add(new cloudwatch.SingleValueWidget({
+dashboard.addWidgets(new cloudwatch.SingleValueWidget({
   title: 'Current messages in queue',
-  metrics: [metric]
+  metrics: [metric],
+}));
+dashboard.addWidgets(new cloudwatch.LogQueryWidget({
+  title: 'Errors in my log group',
+  logGroupNames: ['my-log-group'],
+  queryString: `fields @message
+                | filter @message like /Error/`,
 }));
 
 app.synth();

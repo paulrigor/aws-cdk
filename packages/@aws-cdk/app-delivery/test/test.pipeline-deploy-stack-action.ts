@@ -1,15 +1,15 @@
-import { countResources, expect, haveResource, isSuperObject } from '@aws-cdk/assert';
-import cfn = require('@aws-cdk/aws-cloudformation');
-import codebuild = require('@aws-cdk/aws-codebuild');
-import codepipeline = require('@aws-cdk/aws-codepipeline');
-import cpactions = require('@aws-cdk/aws-codepipeline-actions');
-import iam = require('@aws-cdk/aws-iam');
-import s3 = require('@aws-cdk/aws-s3');
-import cdk = require('@aws-cdk/cdk');
-import { ConstructNode } from '@aws-cdk/cdk';
-import cxapi = require('@aws-cdk/cx-api');
-import fc = require('fast-check');
-import nodeunit = require('nodeunit');
+import { expect, haveResource, haveResourceLike, isSuperObject } from '@aws-cdk/assert';
+import * as cfn from '@aws-cdk/aws-cloudformation';
+import * as codebuild from '@aws-cdk/aws-codebuild';
+import * as codepipeline from '@aws-cdk/aws-codepipeline';
+import * as cpactions from '@aws-cdk/aws-codepipeline-actions';
+import * as events from '@aws-cdk/aws-events';
+import * as iam from '@aws-cdk/aws-iam';
+import * as s3 from '@aws-cdk/aws-s3';
+import * as cxschema from '@aws-cdk/cloud-assembly-schema';
+import * as cdk from '@aws-cdk/core';
+import * as fc from 'fast-check';
+import * as nodeunit from 'nodeunit';
 import { PipelineDeployStackAction } from '../lib/pipeline-deploy-stack-action';
 
 interface SelfUpdatingPipeline {
@@ -31,19 +31,20 @@ export = nodeunit.testCase({
             const pipeline = new codepipeline.Pipeline(stack, 'Pipeline');
             const fakeAction = new FakeAction('Fake');
             pipeline.addStage({
-              name: 'FakeStage',
+              stageName: 'FakeStage',
               actions: [fakeAction],
             });
-            new PipelineDeployStackAction(stack, 'Action', {
+
+            const deployStage = pipeline.addStage({ stageName: 'DeployStage' });
+            deployStage.addAction(new PipelineDeployStackAction({
               changeSetName: 'ChangeSet',
               input: fakeAction.outputArtifact,
               stack: new cdk.Stack(app, 'DeployedStack', { env: { account: stackAccount } }),
-              stage: pipeline.addStage({ name: 'DeployStage' }),
               adminPermissions: false,
-            });
+            }));
           }, 'Cross-environment deployment is not supported');
-        }
-      )
+        },
+      ),
     );
     test.done();
   },
@@ -60,21 +61,21 @@ export = nodeunit.testCase({
             const pipeline = new codepipeline.Pipeline(stack, 'Pipeline');
             const fakeAction = new FakeAction('Fake');
             pipeline.addStage({
-              name: 'FakeStage',
+              stageName: 'FakeStage',
               actions: [fakeAction],
             });
-            new PipelineDeployStackAction(stack, 'Action', {
+            const deployStage = pipeline.addStage({ stageName: 'DeployStage' });
+            deployStage.addAction(new PipelineDeployStackAction({
               changeSetName: 'ChangeSet',
               createChangeSetRunOrder: createRunOrder,
               executeChangeSetRunOrder: executeRunOrder,
               input: fakeAction.outputArtifact,
               stack: new cdk.Stack(app, 'DeployedStack'),
-              stage: pipeline.addStage({ name: 'DeployStage' }),
               adminPermissions: false,
-            });
+            }));
           }, 'createChangeSetRunOrder must be < executeChangeSetRunOrder');
-        }
-      )
+        },
+      ),
     );
     test.done();
   },
@@ -86,67 +87,99 @@ export = nodeunit.testCase({
     const stackWithAnonymousCapability = new cdk.Stack(undefined, 'AnonymousIAM',
       { env: { account: '123456789012', region: 'us-east-1' } });
 
+    const stackWithAutoExpandCapability = new cdk.Stack(undefined, 'AutoExpand',
+      { env: { account: '123456789012', region: 'us-east-1' } });
+
+    const stackWithAnonymousAndAutoExpandCapability = new cdk.Stack(undefined, 'AnonymousIAMAndAutoExpand',
+      { env: { account: '123456789012', region: 'us-east-1' } });
+
     const selfUpdatingStack = createSelfUpdatingStack(pipelineStack);
 
     const pipeline = selfUpdatingStack.pipeline;
-    const selfUpdateStage1 = pipeline.addStage({ name: 'SelfUpdate1' });
-    const selfUpdateStage2 = pipeline.addStage({ name: 'SelfUpdate2' });
-    const selfUpdateStage3 = pipeline.addStage({ name: 'SelfUpdate3' });
 
-    new PipelineDeployStackAction(pipelineStack, 'SelfUpdatePipeline', {
-      stage: selfUpdateStage1,
+    const selfUpdateStage1 = pipeline.addStage({ stageName: 'SelfUpdate1' });
+    const selfUpdateStage2 = pipeline.addStage({ stageName: 'SelfUpdate2' });
+    const selfUpdateStage3 = pipeline.addStage({ stageName: 'SelfUpdate3' });
+    const selfUpdateStage4 = pipeline.addStage({ stageName: 'SelfUpdate4' });
+    const selfUpdateStage5 = pipeline.addStage({ stageName: 'SelfUpdate5' });
+
+    selfUpdateStage1.addAction(new PipelineDeployStackAction({
       stack: pipelineStack,
       input: selfUpdatingStack.synthesizedApp,
-      capabilities: cfn.CloudFormationCapabilities.NamedIAM,
+      capabilities: [cfn.CloudFormationCapabilities.NAMED_IAM],
       adminPermissions: false,
-    });
-    new PipelineDeployStackAction(pipelineStack, 'DeployStack', {
-      stage: selfUpdateStage2,
+    }));
+    selfUpdateStage2.addAction(new PipelineDeployStackAction({
       stack: stackWithNoCapability,
       input: selfUpdatingStack.synthesizedApp,
-      capabilities: cfn.CloudFormationCapabilities.None,
+      capabilities: [cfn.CloudFormationCapabilities.NONE],
       adminPermissions: false,
-    });
-    new PipelineDeployStackAction(pipelineStack, 'DeployStack2', {
-      stage: selfUpdateStage3,
+    }));
+    selfUpdateStage3.addAction(new PipelineDeployStackAction({
       stack: stackWithAnonymousCapability,
       input: selfUpdatingStack.synthesizedApp,
-      capabilities: cfn.CloudFormationCapabilities.AnonymousIAM,
+      capabilities: [cfn.CloudFormationCapabilities.ANONYMOUS_IAM],
       adminPermissions: false,
-    });
+    }));
+    selfUpdateStage4.addAction(new PipelineDeployStackAction({
+      stack: stackWithAutoExpandCapability,
+      input: selfUpdatingStack.synthesizedApp,
+      capabilities: [cfn.CloudFormationCapabilities.AUTO_EXPAND],
+      adminPermissions: false,
+    }));
+    selfUpdateStage5.addAction(new PipelineDeployStackAction({
+      stack: stackWithAnonymousAndAutoExpandCapability,
+      input: selfUpdatingStack.synthesizedApp,
+      capabilities: [cfn.CloudFormationCapabilities.ANONYMOUS_IAM, cfn.CloudFormationCapabilities.AUTO_EXPAND],
+      adminPermissions: false,
+    }));
     expect(pipelineStack).to(haveResource('AWS::CodePipeline::Pipeline', hasPipelineAction({
       Configuration: {
-        StackName: "TestStack",
-        ActionMode: "CHANGE_SET_REPLACE",
-        Capabilities: "CAPABILITY_NAMED_IAM",
-      }
+        StackName: 'TestStack',
+        ActionMode: 'CHANGE_SET_REPLACE',
+        Capabilities: 'CAPABILITY_NAMED_IAM',
+      },
     })));
     expect(pipelineStack).to(haveResource('AWS::CodePipeline::Pipeline', hasPipelineAction({
       Configuration: {
-        StackName: "AnonymousIAM",
-        ActionMode: "CHANGE_SET_REPLACE",
-        Capabilities: "CAPABILITY_IAM",
-      }
+        StackName: 'AnonymousIAM',
+        ActionMode: 'CHANGE_SET_REPLACE',
+        Capabilities: 'CAPABILITY_IAM',
+      },
     })));
     expect(pipelineStack).notTo(haveResource('AWS::CodePipeline::Pipeline', hasPipelineAction({
       Configuration: {
-        StackName: "NoCapStack",
-        ActionMode: "CHANGE_SET_REPLACE",
-        Capabilities: "CAPABILITY_NAMED_IAM",
-      }
+        StackName: 'NoCapStack',
+        ActionMode: 'CHANGE_SET_REPLACE',
+        Capabilities: 'CAPABILITY_NAMED_IAM',
+      },
     })));
     expect(pipelineStack).notTo(haveResource('AWS::CodePipeline::Pipeline', hasPipelineAction({
       Configuration: {
-        StackName: "NoCapStack",
-        ActionMode: "CHANGE_SET_REPLACE",
-        Capabilities: "CAPABILITY_IAM",
-      }
+        StackName: 'NoCapStack',
+        ActionMode: 'CHANGE_SET_REPLACE',
+        Capabilities: 'CAPABILITY_IAM',
+      },
     })));
     expect(pipelineStack).to(haveResource('AWS::CodePipeline::Pipeline', hasPipelineAction({
       Configuration: {
-        StackName: "NoCapStack",
-        ActionMode: "CHANGE_SET_REPLACE",
-      }
+        StackName: 'NoCapStack',
+        ActionMode: 'CHANGE_SET_REPLACE',
+      },
+    })));
+    expect(pipelineStack).to(haveResource('AWS::CodePipeline::Pipeline', hasPipelineAction({
+      Configuration: {
+        StackName: 'AutoExpand',
+        ActionMode: 'CHANGE_SET_REPLACE',
+        Capabilities: 'CAPABILITY_AUTO_EXPAND',
+      },
+    })));
+    expect(pipelineStack).to(haveResource('AWS::CodePipeline::Pipeline', hasPipelineAction({
+      Configuration: {
+        StackName: 'AnonymousIAMAndAutoExpand',
+        ActionMode: 'CHANGE_SET_REPLACE',
+        Capabilities: 'CAPABILITY_IAM,CAPABILITY_AUTO_EXPAND',
+      },
     })));
     test.done();
   },
@@ -155,31 +188,73 @@ export = nodeunit.testCase({
     const selfUpdatingStack = createSelfUpdatingStack(pipelineStack);
 
     const pipeline = selfUpdatingStack.pipeline;
-    const selfUpdateStage = pipeline.addStage({ name: 'SelfUpdate' });
-    new PipelineDeployStackAction(pipelineStack, 'SelfUpdatePipeline', {
-      stage: selfUpdateStage,
+    const selfUpdateStage = pipeline.addStage({ stageName: 'SelfUpdate' });
+    selfUpdateStage.addAction(new PipelineDeployStackAction({
       stack: pipelineStack,
       input: selfUpdatingStack.synthesizedApp,
       adminPermissions: true,
-    });
+    }));
     expect(pipelineStack).to(haveResource('AWS::IAM::Policy', {
       PolicyDocument: {
         Version: '2012-10-17',
         Statement: [
           {
+            Action: [
+              's3:GetObject*',
+              's3:GetBucket*',
+              's3:List*',
+            ],
+            Effect: 'Allow',
+            Resource: [
+              {
+                'Fn::GetAtt': [
+                  'CodePipelineArtifactsBucketF1E925CF',
+                  'Arn',
+                ],
+              },
+              {
+                'Fn::Join': [
+                  '',
+                  [
+                    {
+                      'Fn::GetAtt': [
+                        'CodePipelineArtifactsBucketF1E925CF',
+                        'Arn',
+                      ],
+                    },
+                    '/*',
+                  ],
+                ],
+              },
+            ],
+          },
+          {
+            Action: [
+              'kms:Decrypt',
+              'kms:DescribeKey',
+            ],
+            Effect: 'Allow',
+            Resource: {
+              'Fn::GetAtt': [
+                'CodePipelineArtifactsBucketEncryptionKey85407CB4',
+                'Arn',
+              ],
+            },
+          },
+          {
             Action: '*',
             Effect: 'Allow',
             Resource: '*',
-          }
+          },
         ],
-      }
+      },
     }));
     expect(pipelineStack).to(haveResource('AWS::CodePipeline::Pipeline', hasPipelineAction({
       Configuration: {
-        StackName: "TestStack",
-        ActionMode: "CHANGE_SET_REPLACE",
-        Capabilities: "CAPABILITY_NAMED_IAM",
-      }
+        StackName: 'TestStack',
+        ActionMode: 'CHANGE_SET_REPLACE',
+        Capabilities: 'CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND',
+      },
     })));
     test.done();
   },
@@ -191,14 +266,14 @@ export = nodeunit.testCase({
       assumedBy: new iam.ServicePrincipal('cloudformation.amazonaws.com'),
     });
     const pipeline = selfUpdatingStack.pipeline;
-    const selfUpdateStage = pipeline.addStage({ name: 'SelfUpdate' });
-    const deployAction = new PipelineDeployStackAction(pipelineStack, 'SelfUpdatePipeline', {
-      stage: selfUpdateStage,
+    const selfUpdateStage = pipeline.addStage({ stageName: 'SelfUpdate' });
+    const deployAction = new PipelineDeployStackAction({
       stack: pipelineStack,
       input: selfUpdatingStack.synthesizedApp,
       adminPermissions: false,
-      role
+      role,
     });
+    selfUpdateStage.addAction(deployAction);
     test.same(deployAction.deploymentRole, role);
     test.done();
   },
@@ -214,34 +289,75 @@ export = nodeunit.testCase({
 
     // WHEN //
     // this our app/service/infra to deploy
-    const deployStage = pipeline.addStage({ name: 'Deploy' });
-    const deployAction = new PipelineDeployStackAction(pipelineStack, 'DeployServiceStackA', {
-      stage: deployStage,
+    const deployStage = pipeline.addStage({ stageName: 'Deploy' });
+    const deployAction = new PipelineDeployStackAction({
       stack: emptyStack,
       input: selfUpdatingStack.synthesizedApp,
       adminPermissions: false,
     });
+    deployStage.addAction(deployAction);
     // we might need to add permissions
-    deployAction.addToDeploymentRolePolicy( new iam.PolicyStatement().
-      addActions(
+    deployAction.addToDeploymentRolePolicy(new iam.PolicyStatement({
+      actions: [
         'ec2:AuthorizeSecurityGroupEgress',
         'ec2:AuthorizeSecurityGroupIngress',
         'ec2:DeleteSecurityGroup',
         'ec2:DescribeSecurityGroups',
         'ec2:CreateSecurityGroup',
         'ec2:RevokeSecurityGroupEgress',
-        'ec2:RevokeSecurityGroupIngress'
-      ).
-      addAllResources());
+        'ec2:RevokeSecurityGroupIngress',
+      ],
+      resources: ['*'],
+    }));
 
     // THEN //
-    // there should be 3 policies 1. CodePipeline, 2. Codebuild, 3.
-    // ChangeSetDeploy Action
-    expect(pipelineStack).to(countResources('AWS::IAM::Policy', 3));
     expect(pipelineStack).to(haveResource('AWS::IAM::Policy', {
       PolicyDocument: {
         Version: '2012-10-17',
         Statement: [
+          {
+            Action: [
+              's3:GetObject*',
+              's3:GetBucket*',
+              's3:List*',
+            ],
+            Effect: 'Allow',
+            Resource: [
+              {
+                'Fn::GetAtt': [
+                  'CodePipelineArtifactsBucketF1E925CF',
+                  'Arn',
+                ],
+              },
+              {
+                'Fn::Join': [
+                  '',
+                  [
+                    {
+                      'Fn::GetAtt': [
+                        'CodePipelineArtifactsBucketF1E925CF',
+                        'Arn',
+                      ],
+                    },
+                    '/*',
+                  ],
+                ],
+              },
+            ],
+          },
+          {
+            Action: [
+              'kms:Decrypt',
+              'kms:DescribeKey',
+            ],
+            Effect: 'Allow',
+            Resource: {
+              'Fn::GetAtt': [
+                'CodePipelineArtifactsBucketEncryptionKey85407CB4',
+                'Arn',
+              ],
+            },
+          },
           {
             Action: [
               'ec2:AuthorizeSecurityGroupEgress',
@@ -250,7 +366,7 @@ export = nodeunit.testCase({
               'ec2:DescribeSecurityGroups',
               'ec2:CreateSecurityGroup',
               'ec2:RevokeSecurityGroupEgress',
-              'ec2:RevokeSecurityGroupIngress'
+              'ec2:RevokeSecurityGroupIngress',
             ],
             Effect: 'Allow',
             Resource: '*',
@@ -271,50 +387,85 @@ export = nodeunit.testCase({
         fc.integer(1, 5),
         (assetCount) => {
           const app = new cdk.App();
-          const stack = new cdk.Stack(app, 'Test');
-          const pipeline = new codepipeline.Pipeline(stack, 'Pipeline');
-          const fakeAction = new FakeAction('Fake');
-          pipeline.addStage({
-            name: 'FakeStage',
-            actions: [fakeAction],
-          });
+
           const deployedStack = new cdk.Stack(app, 'DeployedStack');
-          const deployStage = pipeline.addStage({ name: 'DeployStage' });
-          const action = new PipelineDeployStackAction(stack, 'Action', {
-            changeSetName: 'ChangeSet',
-            input: fakeAction.outputArtifact,
-            stack: deployedStack,
-            stage: deployStage,
-            adminPermissions: false,
-          });
           for (let i = 0 ; i < assetCount ; i++) {
-            deployedStack.node.addMetadata(cxapi.ASSET_METADATA, {});
+            deployedStack.node.addMetadata(cxschema.ArtifactMetadataEntryType.ASSET, {});
           }
-          test.deepEqual(ConstructNode.validate(action.node).map(x => x.message),
-            [`Cannot deploy the stack DeployedStack because it references ${assetCount} asset(s)`]);
-        }
-      )
+
+          test.throws(() => {
+            new PipelineDeployStackAction({
+              changeSetName: 'ChangeSet',
+              input: new codepipeline.Artifact(),
+              stack: deployedStack,
+              adminPermissions: false,
+            });
+          }, /Cannot deploy the stack DeployedStack because it references/);
+        },
+      ),
     );
     test.done();
-  }
+  },
+
+  'allows overriding the ChangeSet and Execute action names'(test: nodeunit.Test) {
+    const stack = getTestStack();
+    const selfUpdatingPipeline = createSelfUpdatingStack(stack);
+    selfUpdatingPipeline.pipeline.addStage({
+      stageName: 'Deploy',
+      actions: [
+        new PipelineDeployStackAction({
+          input: selfUpdatingPipeline.synthesizedApp,
+          adminPermissions: true,
+          stack,
+          createChangeSetActionName: 'Prepare',
+          executeChangeSetActionName: 'Deploy',
+        }),
+      ],
+    });
+
+    expect(stack).to(haveResourceLike('AWS::CodePipeline::Pipeline', {
+      Stages: [
+        {},
+        {},
+        {
+          Name: 'Deploy',
+          Actions: [
+            {
+              Name: 'Prepare',
+            },
+            {
+              Name: 'Deploy',
+            },
+          ],
+        },
+      ],
+    }));
+
+    test.done();
+  },
 });
 
-class FakeAction extends codepipeline.Action {
+class FakeAction implements codepipeline.IAction {
+  public readonly actionProperties: codepipeline.ActionProperties;
   public readonly outputArtifact: codepipeline.Artifact;
 
   constructor(actionName: string) {
-    super({
+    this.actionProperties = {
       actionName,
       artifactBounds: { minInputs: 0, maxInputs: 5, minOutputs: 0, maxOutputs: 5 },
-      category: codepipeline.ActionCategory.Test,
+      category: codepipeline.ActionCategory.TEST,
       provider: 'Test',
-    });
-
+    };
     this.outputArtifact = new codepipeline.Artifact('OutputArtifact');
   }
 
-  protected bind(_info: codepipeline.ActionBind): void {
-    // do nothing
+  public bind(_scope: cdk.Construct, _stage: codepipeline.IStage, _options: codepipeline.ActionBindOptions):
+  codepipeline.ActionConfig {
+    return {};
+  }
+
+  public onStateChange(_name: string, _target?: events.IRuleTarget, _options?: events.RuleProps): events.Rule {
+    throw new Error('onStateChange() is not available on FakeAction');
   }
 }
 
@@ -337,7 +488,7 @@ function createSelfUpdatingStack(pipelineStack: cdk.Stack): SelfUpdatingPipeline
     output: sourceOutput,
   });
   pipeline.addStage({
-    name: 'source',
+    stageName: 'source',
     actions: [sourceAction],
   });
 
@@ -347,10 +498,10 @@ function createSelfUpdatingStack(pipelineStack: cdk.Stack): SelfUpdatingPipeline
     actionName: 'CodeBuild',
     project,
     input: sourceOutput,
-    output: buildOutput,
+    outputs: [buildOutput],
   });
   pipeline.addStage({
-    name: 'build',
+    stageName: 'build',
     actions: [buildAction],
   });
   return {synthesizedApp: buildOutput, pipeline};

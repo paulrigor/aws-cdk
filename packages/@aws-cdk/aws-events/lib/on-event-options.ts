@@ -1,5 +1,5 @@
-import { EventPattern } from "./event-pattern";
-import { IRuleTarget } from "./target";
+import { EventPattern } from './event-pattern';
+import { IRuleTarget } from './target';
 
 /**
  * Standard set of options for `onXxx` event handlers on construct
@@ -7,11 +7,15 @@ import { IRuleTarget } from "./target";
 export interface OnEventOptions {
   /**
    * The target to register for the event
+   *
+   * @default - No target is added to the rule. Use `addTarget()` to add a target.
    */
-  readonly target: IRuleTarget;
+  readonly target?: IRuleTarget;
 
   /**
    * A description of the rule's purpose.
+   *
+   * @default - No description
    */
   readonly description?: string;
 
@@ -29,8 +33,10 @@ export interface OnEventOptions {
    * filtering. The filtering implied by what you pass here is added
    * on top of that filtering.
    *
+   * @default - No additional filtering based on an event pattern.
+   *
    * @see
-   * http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/CloudWatchEventsandEventPatterns.html
+   * https://docs.aws.amazon.com/eventbridge/latest/userguide/eventbridge-and-event-patterns.html
    */
   readonly eventPattern?: EventPattern;
 }

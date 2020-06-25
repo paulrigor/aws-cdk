@@ -3,13 +3,14 @@
 // Does not include the actual code generation itself.
 
 import { schema } from '@aws-cdk/cfnspec';
-import codemaker = require('codemaker');
+import * as codemaker from 'codemaker';
 import { itemTypeNames, PropertyAttributeName, scalarTypeNames, SpecName } from './spec-utils';
-import util = require('./util');
+import * as util from './util';
 
 const RESOURCE_CLASS_PREFIX = 'Cfn';
 
 export const CORE_NAMESPACE = 'cdk';
+export const CFN_PARSE_NAMESPACE = 'cfn_parse';
 
 /**
  * The name of a class or method in the generated code.
@@ -43,11 +44,12 @@ export class CodeName {
   }
 
   // tslint:disable:no-shadowed-variable
-  constructor(readonly packageName: string,
-              readonly namespace: string,
-              readonly className: string,
-              readonly specName?: SpecName,
-              readonly methodName?: string) {
+  constructor(
+    readonly packageName: string,
+    readonly namespace: string,
+    readonly className: string,
+    readonly specName?: SpecName,
+    readonly methodName?: string) {
   }
   // tslint:enable:no-shadowed-variable
 
@@ -57,7 +59,7 @@ export class CodeName {
    * Simply returns the top-level declaration name,  but reads better at the call site if
    * we're generating a function instead of a class.
    */
-  public get functionName() {
+  public get functionName(): string {
     return this.className;
   }
 
@@ -66,7 +68,7 @@ export class CodeName {
    *
    * (When referred to it from the same package)
    */
-  public get fqn() {
+  public get fqn(): string {
     return util.joinIf(this.namespace, '.', util.joinIf(this.className, '.', this.methodName));
   }
 
@@ -88,7 +90,7 @@ export class CodeName {
 }
 
 export const TAG_NAME = new CodeName('', CORE_NAMESPACE, 'CfnTag');
-export const TOKEN_NAME = new CodeName('', CORE_NAMESPACE, 'Token');
+export const TOKEN_NAME = new CodeName('', CORE_NAMESPACE, 'IResolvable');
 
 /**
  * Resource attribute
@@ -125,7 +127,7 @@ export function packageName(module: SpecName | string): string {
 /**
  * Overrides special-case namespaces like serverless=>sam
  */
-function overridePackageName(name: string) {
+function overridePackageName(name: string): string {
   if (name === 'serverless') {
     return 'sam';
   }
@@ -141,10 +143,33 @@ function overridePackageName(name: string) {
 export function cfnMapperName(typeName: CodeName): CodeName {
   if (!typeName.packageName) {
     // Built-in or intrinsic type, built-in mappers
-    return new CodeName('', CORE_NAMESPACE, '', undefined, util.downcaseFirst(`${typeName.className}ToCloudFormation`));
+    const mappedType = typeName.className === 'any' ? 'object' : typeName.className;
+    return new CodeName('', CORE_NAMESPACE, '', undefined, util.downcaseFirst(`${mappedType}ToCloudFormation`));
   }
 
   return new CodeName(typeName.packageName, '', util.downcaseFirst(`${typeName.namespace}${typeName.className}ToCloudFormation`));
+}
+
+/**
+ * Return the name of the function that converts a pure CloudFormation value
+ * to the appropriate CDK struct instance.
+ */
+export function fromCfnFactoryName(typeName: CodeName): CodeName {
+  if (isPrimitive(typeName)) {
+    // primitive types are handled by specialized functions from @aws-cdk/core
+    return new CodeName('', CFN_PARSE_NAMESPACE, 'FromCloudFormation', undefined, `get${util.upcaseFirst(typeName.className)}`);
+  } else if (isCloudFormationTagCodeName(typeName)) {
+    // tags, since they are shared, have their own function in @aws-cdk/core
+    return new CodeName('', CFN_PARSE_NAMESPACE, 'FromCloudFormation', undefined, 'getCfnTag');
+  } else {
+    return new CodeName(typeName.packageName, '', `${typeName.namespace}${typeName.className}FromCloudFormation`);
+  }
+}
+
+function isCloudFormationTagCodeName(codeName: CodeName): boolean {
+  return codeName.className === TAG_NAME.className &&
+    codeName.packageName === TAG_NAME.packageName &&
+    codeName.namespace === TAG_NAME.namespace;
 }
 
 /**
@@ -153,7 +178,8 @@ export function cfnMapperName(typeName: CodeName): CodeName {
 export function validatorName(typeName: CodeName): CodeName {
   if (typeName.packageName === '') {
     // Built-in or intrinsic type, built-in validators
-    return new CodeName('', CORE_NAMESPACE, '', undefined, `validate${codemaker.toPascalCase(typeName.className)}`);
+    const validatedType = typeName.className === 'any' ? 'Object' : codemaker.toPascalCase(typeName.className);
+    return new CodeName('', CORE_NAMESPACE, '', undefined, `validate${validatedType}`);
   }
 
   return new CodeName(typeName.packageName, '', `${util.joinIf(typeName.namespace, '_', typeName.className)}Validator`);
@@ -167,13 +193,16 @@ export function validatorName(typeName: CodeName): CodeName {
  * - The type we will generate for the attribute, including its base class and docs.
  * - The property name we will use to refer to the attribute.
  */
-export function attributeDefinition(resourceName: CodeName, attributeName: string, spec: schema.Attribute): Attribute {
-  const descriptiveName = descriptiveAttributeName(resourceName, attributeName);  // "BucketArn"
-  const propertyName = cloudFormationToScriptName(descriptiveName);      // "bucketArn"
+export function attributeDefinition(attributeName: string, spec: schema.Attribute): Attribute {
+  const descriptiveName = attributeName.replace(/\./g, '');
+  const suffixName = codemaker.toPascalCase(cloudFormationToScriptName(descriptiveName));
+  const propertyName = `attr${suffixName}`;      // "attrArn"
 
   let attrType: string;
   if ('PrimitiveType' in spec && spec.PrimitiveType === 'String') {
     attrType = 'string';
+  } else if ('PrimitiveType' in spec && spec.PrimitiveType === 'Integer') {
+    attrType = 'number';
   } else if ('Type' in spec && 'PrimitiveItemType' in spec && spec.Type === 'List' && spec.PrimitiveItemType === 'String') {
     attrType = 'string[]';
   } else {
@@ -184,43 +213,6 @@ export function attributeDefinition(resourceName: CodeName, attributeName: strin
 
   const constructorArguments = `this.getAtt('${attributeName}')`;
   return new Attribute(propertyName, attrType, constructorArguments);
-}
-
-/**
- * Return an attribute definition name for the RefKind for this class
- */
-export function refAttributeDefinition(resourceName: CodeName, refKind: string): Attribute {
-  const propertyName = codemaker.toCamelCase(descriptiveAttributeName(resourceName, refKind));
-
-  const constructorArguments = 'this.ref';
-
-  return new Attribute(propertyName, 'string', constructorArguments);
-}
-
-/**
- * In the CDK, attribute names will be prefixed with the name of the resource (unless they already
- * have the name of the resource as a prefix). There are a few reasons for that, mainly to avoid name
- * collisions with base class properties, but also to allow certain constructs to expose multiple attributes
- * of different sub-resources using the same names (i.e. 'bucketArn' and 'topicArn' can co-exist while 'arn' and 'arn' cannot).
- */
-function descriptiveAttributeName(resourceName: CodeName, attributeName: string): string {
-  // remove '.'s
-  attributeName = attributeName.replace(/\./g, '');
-
-  const resName = resourceName.specName!.resourceName;
-
-  // special case (someone was smart)
-  if (resName === 'SecurityGroup' && attributeName === 'GroupId') {
-    attributeName = 'SecurityGroupId';
-  }
-
-  // if property name already starts with the resource name, then just use it as-is
-  // otherwise, prepend the resource name
-  if (!attributeName.toLowerCase().startsWith(resName.toLowerCase())) {
-    attributeName = `${resName}${codemaker.toPascalCase(attributeName)}`;
-  }
-
-  return attributeName;
 }
 
 /**
@@ -252,7 +244,7 @@ function specPrimitiveToCodePrimitive(type: schema.PrimitiveType): CodeName {
     case 'Boolean': return CodeName.forPrimitive('boolean');
     case 'Double': return CodeName.forPrimitive('number');
     case 'Integer': return CodeName.forPrimitive('number');
-    case 'Json': return CodeName.forPrimitive('object');
+    case 'Json': return CodeName.forPrimitive('any');
     case 'Long': return CodeName.forPrimitive('number');
     case 'String': return CodeName.forPrimitive('string');
     case 'Timestamp': return CodeName.forPrimitive('Date');
@@ -263,7 +255,7 @@ function specPrimitiveToCodePrimitive(type: schema.PrimitiveType): CodeName {
 export function isPrimitive(type: CodeName): boolean {
   return type.className === 'boolean'
     || type.className === 'number'
-    || type.className === 'object'
+    || type.className === 'any'
     || type.className === 'string'
     || type.className === 'Date';
 }
@@ -289,23 +281,60 @@ export function specTypesToCodeTypes(resourceContext: CodeName, types: string[])
 }
 
 export interface PropertyVisitor<T> {
-  visitScalar(type: CodeName): T;
-  visitUnionScalar(types: CodeName[]): T;
+
+  /**
+   * A single type (either built-in or complex)
+   */
+  visitAtom(type: CodeName): T;
+
+  /**
+   * A union of atomic types
+   */
+  visitAtomUnion(types: CodeName[]): T;
+
+  /**
+   * A list of atoms
+   */
   visitList(itemType: CodeName): T;
+
+  /**
+   * List of unions
+   */
   visitUnionList(itemTypes: CodeName[]): T;
+
+  /**
+   * Map of atoms
+   */
   visitMap(itemType: CodeName): T;
+
+  /**
+   * Map of unions
+   */
   visitUnionMap(itemTypes: CodeName[]): T;
-  visitListOrScalar(scalarTypes: CodeName[], itemTypes: CodeName[]): any;
+
+  /**
+   * Union of list type and atom type
+   */
+  visitListOrAtom(scalarTypes: CodeName[], itemTypes: CodeName[]): any;
 }
 
+/**
+ * Invoke the right visitor method for the given property, depending on its type
+ *
+ * We use the term "atom" in this context to mean a type that can only accept a single
+ * value of a given type. This is to contrast it with collections and unions.
+ */
 export function typeDispatch<T>(resourceContext: CodeName, spec: schema.Property, visitor: PropertyVisitor<T>): T {
   const scalarTypes = specTypesToCodeTypes(resourceContext, scalarTypeNames(spec));
   const itemTypes = specTypesToCodeTypes(resourceContext, itemTypeNames(spec));
 
   if (scalarTypes.length && itemTypes.length) {
-    // Can accept both a list and a scalar
-    return visitor.visitListOrScalar(scalarTypes, itemTypes);
-  } else if (schema.isCollectionProperty(spec)) {
+    // Can accept both a collection a/nd a scalar
+    return visitor.visitListOrAtom(scalarTypes, itemTypes);
+  }
+
+  if (schema.isCollectionProperty(spec)) {
+    // List or map, of either atoms or unions
     if (schema.isMapProperty(spec)) {
       if (itemTypes.length > 1) {
         return visitor.visitUnionMap(itemTypes);
@@ -319,11 +348,13 @@ export function typeDispatch<T>(resourceContext: CodeName, spec: schema.Property
         return visitor.visitList(itemTypes[0]);
       }
     }
-  } else {
-    if (scalarTypes.length > 1) {
-      return visitor.visitUnionScalar(scalarTypes);
-    } else {
-      return visitor.visitScalar(scalarTypes[0]);
-    }
   }
+
+  // Atom or union of atoms
+  if (scalarTypes.length > 1) {
+    return visitor.visitAtomUnion(scalarTypes);
+  } else {
+    return visitor.visitAtom(scalarTypes[0]);
+  }
+
 }

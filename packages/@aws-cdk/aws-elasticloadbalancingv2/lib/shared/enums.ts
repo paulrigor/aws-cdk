@@ -5,37 +5,47 @@ export enum IpAddressType {
   /**
    * Allocate IPv4 addresses
    */
-  Ipv4 = 'ipv4',
+  IPV4 = 'ipv4',
 
   /**
    * Allocate both IPv4 and IPv6 addresses
    */
-  DualStack = 'dualstack',
+  DUAL_STACK = 'dualstack',
 }
 
 /**
- * Backend protocol for health checks
+ * Backend protocol for network load balancers and health checks
  */
 export enum Protocol {
   /**
-   * HTTP
+   * HTTP (ALB health checks and NLB health checks)
    */
-  Http = 'HTTP',
+  HTTP = 'HTTP',
 
   /**
-   * HTTPS
+   * HTTPS (ALB health checks and NLB health checks)
    */
-  Https = 'HTTPS',
+  HTTPS = 'HTTPS',
 
   /**
-   * TCP
+   * TCP (NLB, NLB health checks)
    */
-  Tcp = 'TCP',
+  TCP = 'TCP',
 
   /**
-   * TLS
+   * TLS (NLB)
    */
-  Tls = 'TLS'
+  TLS = 'TLS',
+
+  /**
+   * UDP (NLB)
+   */
+  UDP = 'UDP',
+
+  /**
+   * Listen to both TCP and UDP on the same port (NLB)
+   */
+  TCP_UDP = 'TCP_UDP',
 }
 
 /**
@@ -45,12 +55,12 @@ export enum ApplicationProtocol {
   /**
    * HTTP
    */
-  Http = 'HTTP',
+  HTTP = 'HTTP',
 
   /**
    * HTTPS
    */
-  Https = 'HTTPS'
+  HTTPS = 'HTTPS'
 }
 
 /**
@@ -70,12 +80,27 @@ export enum SslPolicy {
   /**
    * The recommended security policy
    */
-  Recommended = 'ELBSecurityPolicy-2016-08',
+  RECOMMENDED = 'ELBSecurityPolicy-2016-08',
+
+  /**
+   * Strong forward secrecy ciphers and TLS1.2 only
+   */
+  FORWARD_SECRECY_TLS12_RES = 'ELBSecurityPolicy-FS-1-2-Res-2019-08',
+
+  /**
+   * Forward secrecy ciphers and TLS1.2 only
+   */
+  FORWARD_SECRECY_TLS12 = 'ELBSecurityPolicy-FS-1-2-2019-08',
+
+  /**
+   * Forward secrecy ciphers only with TLS1.1 and higher
+   */
+  FORWARD_SECRECY_TLS11 = 'ELBSecurityPolicy-FS-1-1-2019-08',
 
   /**
    * Forward secrecy ciphers only
    */
-  ForwardSecrecy = 'ELBSecurityPolicy-FS-2018-06',
+  FORWARD_SECRECY = 'ELBSecurityPolicy-FS-2018-06',
 
   /**
    * TLS1.2 only and no SHA ciphers
@@ -85,7 +110,7 @@ export enum SslPolicy {
   /**
    * TLS1.2 only with all ciphers
    */
-  TLS12Ext = 'ELBSecurityPolicy-TLS-1-2-Ext-2018-06',
+  TLS12_EXT = 'ELBSecurityPolicy-TLS-1-2-Ext-2018-06',
 
   /**
    * TLS1.1 and higher with all ciphers
@@ -98,7 +123,7 @@ export enum SslPolicy {
    * Do not use this security policy unless you must support a legacy client
    * that requires the DES-CBC3-SHA cipher, which is a weak cipher.
    */
-  Legacy = 'ELBSecurityPolicy-TLS-1-0-2015-04',
+  LEGACY = 'ELBSecurityPolicy-TLS-1-0-2015-04',
 }
 
 /**
@@ -108,10 +133,15 @@ export enum TargetType {
   /**
    * Targets identified by instance ID
    */
-  Instance = 'instance',
+  INSTANCE = 'instance',
 
   /**
    * Targets identified by IP address
    */
-  Ip = 'ip',
+  IP = 'ip',
+
+  /**
+   * Target is a single Lambda Function
+   */
+  LAMBDA = 'lambda',
 }

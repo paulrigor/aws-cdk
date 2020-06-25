@@ -1,7 +1,7 @@
-import codecommit = require('@aws-cdk/aws-codecommit');
-import codepipeline = require('@aws-cdk/aws-codepipeline');
-import cdk = require('@aws-cdk/cdk');
-import cpactions = require('../lib');
+import * as codecommit from '@aws-cdk/aws-codecommit';
+import * as codepipeline from '@aws-cdk/aws-codepipeline';
+import * as cdk from '@aws-cdk/core';
+import * as cpactions from '../lib';
 
 const app = new cdk.App();
 const stack = new cdk.Stack(app, 'aws-cdk-codepipeline-cloudformation');
@@ -9,17 +9,17 @@ const stack = new cdk.Stack(app, 'aws-cdk-codepipeline-cloudformation');
 /// !show
 // Source stage: read from repository
 const repo = new codecommit.Repository(stack, 'TemplateRepo', {
-  repositoryName: 'template-repo'
+  repositoryName: 'template-repo',
 });
 const sourceOutput = new codepipeline.Artifact('SourceArtifact');
 const source = new cpactions.CodeCommitSourceAction({
   actionName: 'Source',
   repository: repo,
   output: sourceOutput,
-  pollForSourceChanges: true,
+  trigger: cpactions.CodeCommitTrigger.POLL,
 });
 const sourceStage = {
-  name: 'Source',
+  stageName: 'Source',
   actions: [source],
 };
 
@@ -28,7 +28,7 @@ const stackName = 'OurStack';
 const changeSetName = 'StagedChangeSet';
 
 const prodStage = {
-  name: 'Deploy',
+  stageName: 'Deploy',
   actions: [
     new cpactions.CloudFormationCreateReplaceChangeSetAction({
       actionName: 'PrepareChanges',
@@ -53,8 +53,8 @@ const prodStage = {
 
 new codepipeline.Pipeline(stack, 'Pipeline', {
   stages: [
-      sourceStage,
-      prodStage,
+    sourceStage,
+    prodStage,
   ],
 });
 /// !hide

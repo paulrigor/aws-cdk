@@ -1,6 +1,7 @@
-import { IResource } from '@aws-cdk/cdk';
-import { Policy } from "./policy";
-import { IPrincipal } from "./principals";
+import { IResource } from '@aws-cdk/core';
+import { IManagedPolicy } from './managed-policy';
+import { Policy } from './policy';
+import { IPrincipal } from './principals';
 
 /**
  * A construct that represents an IAM principal, such as a user, group or role.
@@ -15,7 +16,7 @@ export interface IIdentity extends IPrincipal, IResource {
 
   /**
    * Attaches a managed policy to this principal.
-   * @param arn The ARN of the managed policy
+   * @param policy The managed policy
    */
-  attachManagedPolicy(arn: string): void;
+  addManagedPolicy(policy: IManagedPolicy): void;
 }

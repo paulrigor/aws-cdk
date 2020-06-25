@@ -1,12 +1,18 @@
-import { Construct, Resource, Stack } from '@aws-cdk/cdk';
+import { Construct, Duration, Lazy, Resource, Stack, Token } from '@aws-cdk/core';
 import { Grant } from './grant';
 import { CfnRole } from './iam.generated';
 import { IIdentity } from './identity-base';
+import { IManagedPolicy } from './managed-policy';
 import { Policy } from './policy';
-import { PolicyDocument, PolicyStatement } from './policy-document';
-import { ArnPrincipal, IPrincipal, PrincipalPolicyFragment } from './principals';
-import { AttachedPolicies, undefinedIfEmpty } from './util';
+import { PolicyDocument } from './policy-document';
+import { PolicyStatement } from './policy-statement';
+import { AddToPrincipalPolicyResult, ArnPrincipal, IPrincipal, PrincipalPolicyFragment } from './principals';
+import { ImmutableRole } from './private/immutable-role';
+import { AttachedPolicies } from './util';
 
+/**
+ * Properties for defining an IAM Role
+ */
 export interface RoleProps {
   /**
    * The IAM principal (i.e. `new ServicePrincipal('sns.amazonaws.com')`)
@@ -23,17 +29,31 @@ export interface RoleProps {
    * If the configured and provided external IDs do not match, the
    * AssumeRole operation will fail.
    *
+   * @deprecated see {@link externalIds}
+   *
    * @default No external ID required
    */
   readonly externalId?: string;
 
   /**
-   * A list of ARNs for managed policies associated with this role.
-   * You can add managed policies later using `attachManagedPolicy(arn)`.
+   * List of IDs that the role assumer needs to provide one of when assuming this role
+   *
+   * If the configured and provided external IDs do not match, the
+   * AssumeRole operation will fail.
+   *
+   * @default No external ID required
+   */
+  readonly externalIds?: string[];
+
+  /**
+   * A list of managed policies associated with this role.
+   *
+   * You can add managed policies later using
+   * `addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName(policyName))`.
    *
    * @default - No managed policies.
    */
-  readonly managedPolicyArns?: string[];
+  readonly managedPolicies?: IManagedPolicy[];
 
   /**
    * A list of named policies to inline into this role. These policies will be
@@ -54,6 +74,21 @@ export interface RoleProps {
   readonly path?: string;
 
   /**
+   * AWS supports permissions boundaries for IAM entities (users or roles).
+   * A permissions boundary is an advanced feature for using a managed policy
+   * to set the maximum permissions that an identity-based policy can grant to
+   * an IAM entity. An entity's permissions boundary allows it to perform only
+   * the actions that are allowed by both its identity-based policies and its
+   * permissions boundaries.
+   *
+   * @link https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html#cfn-iam-role-permissionsboundary
+   * @link https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html
+   *
+   * @default - No permissions boundary.
+   */
+  readonly permissionsBoundary?: IManagedPolicy;
+
+  /**
    * A name for the IAM role. For valid values, see the RoleName parameter for
    * the CreateRole action in the IAM API Reference.
    *
@@ -71,9 +106,8 @@ export interface RoleProps {
   readonly roleName?: string;
 
   /**
-   * The maximum session duration (in seconds) that you want to set for the
-   * specified role. This setting can have a value from 1 hour (3600sec) to
-   * 12 (43200sec) hours.
+   * The maximum session duration that you want to set for the specified role.
+   * This setting can have a value from 1 hour (3600sec) to 12 (43200sec) hours.
    *
    * Anyone who assumes the role from the AWS CLI or API can use the
    * DurationSeconds API parameter or the duration-seconds CLI parameter to
@@ -88,9 +122,30 @@ export interface RoleProps {
    *
    * @link https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use.html
    *
-   * @default 3600 (1 hour)
+   * @default Duration.hours(1)
    */
-  readonly maxSessionDurationSec?: number;
+  readonly maxSessionDuration?: Duration;
+
+  /**
+   * A description of the role. It can be up to 1000 characters long.
+   *
+   * @default - No description.
+   */
+  readonly description?: string;
+}
+
+/**
+ * Options allowing customizing the behavior of {@link Role.fromRoleArn}.
+ */
+export interface FromRoleArnOptions {
+  /**
+   * Whether the imported role can be modified by attaching policy resources to it.
+   *
+   * @default true
+   *
+   * @experimental
+   */
+  readonly mutable?: boolean;
 }
 
 /**
@@ -100,33 +155,73 @@ export interface RoleProps {
  * the specified AWS service principal defined in `serviceAssumeRole`.
  */
 export class Role extends Resource implements IRole {
-
   /**
-   * Imports an external role by ARN
+   * Import an external role by ARN.
+   *
+   * If the imported Role ARN is a Token (such as a
+   * `CfnParameter.valueAsString` or a `Fn.importValue()`) *and* the referenced
+   * role has a `path` (like `arn:...:role/AdminRoles/Alice`), the
+   * `roleName` property will not resolve to the correct value. Instead it
+   * will resolve to the first path component. We unfortunately cannot express
+   * the correct calculation of the full path name as a CloudFormation
+   * expression. In this scenario the Role ARN should be supplied without the
+   * `path` in order to resolve the correct role resource.
+   *
    * @param scope construct scope
    * @param id construct id
    * @param roleArn the ARN of the role to import
+   * @param options allow customizing the behavior of the returned role
    */
-  public static fromRoleArn(scope: Construct, id: string, roleArn: string): IRole {
+  public static fromRoleArn(scope: Construct, id: string, roleArn: string, options: FromRoleArnOptions = {}): IRole {
+    const scopeStack = Stack.of(scope);
+    const parsedArn = scopeStack.parseArn(roleArn);
+    const resourceName = parsedArn.resourceName!;
+    // service roles have an ARN like 'arn:aws:iam::<account>:role/service-role/<roleName>'
+    // we want to support these as well, so strip out the 'service-role/' prefix if we see it
+    const roleName = resourceName.startsWith('service-role/')
+      ? resourceName.slice('service-role/'.length)
+      : resourceName;
 
-    class Import extends Construct implements IRole {
+    class Import extends Resource implements IRole {
       public readonly grantPrincipal: IPrincipal = this;
       public readonly assumeRoleAction: string = 'sts:AssumeRole';
       public readonly policyFragment = new ArnPrincipal(roleArn).policyFragment;
       public readonly roleArn = roleArn;
-      public readonly roleName = Stack.of(scope).parseArn(roleArn).resourceName!;
+      public readonly roleName = roleName;
+      private readonly attachedPolicies = new AttachedPolicies();
+      private defaultPolicy?: Policy;
 
-      public addToPolicy(_statement: PolicyStatement): boolean {
-        // Statement will be added to resource instead
-        return false;
+      public addToPolicy(statement: PolicyStatement): boolean {
+        return this.addToPrincipalPolicy(statement).statementAdded;
       }
 
-      public attachInlinePolicy(_policy: Policy): void {
+      public addToPrincipalPolicy(statement: PolicyStatement): AddToPrincipalPolicyResult {
+        if (!this.defaultPolicy) {
+          this.defaultPolicy = new Policy(this, 'Policy');
+          this.attachInlinePolicy(this.defaultPolicy);
+        }
+        this.defaultPolicy.addStatements(statement);
+        return { statementAdded: true, policyDependable: this.defaultPolicy };
+      }
+
+      public attachInlinePolicy(policy: Policy): void {
+        const policyAccount = Stack.of(policy).account;
+
+        if (accountsAreEqualOrOneIsUnresolved(policyAccount, roleAccount)) {
+          this.attachedPolicies.attach(policy);
+          policy.attachToRole(this);
+        }
+      }
+
+      public addManagedPolicy(_policy: IManagedPolicy): void {
         // FIXME: Add warning that we're ignoring this
       }
 
-      public attachManagedPolicy(_arn: string): void {
-        // FIXME: Add warning that we're ignoring this
+      /**
+       * Grant permissions to the given principal to pass this role.
+       */
+      public grantPassRole(identity: IPrincipal): Grant {
+        return this.grant(identity, 'iam:PassRole');
       }
 
       /**
@@ -137,20 +232,25 @@ export class Role extends Resource implements IRole {
           grantee,
           actions,
           resourceArns: [this.roleArn],
-          scope: this
+          scope: this,
         });
-      }
-
-      /**
-       * Grant permissions to the given principal to pass this role.
-       */
-      public grantPassRole(identity: IPrincipal): Grant {
-        return this.grant(identity, 'iam:PassRole');
       }
     }
 
-    return new Import(scope, id);
+    const roleAccount = parsedArn.account;
 
+    const scopeAccount = scopeStack.account;
+
+    return options.mutable !== false && accountsAreEqualOrOneIsUnresolved(scopeAccount, roleAccount)
+      ? new Import(scope, id)
+      : new ImmutableRole(scope, `ImmutableRole${id}`, new Import(scope, id));
+
+    function accountsAreEqualOrOneIsUnresolved(
+      account1: string | undefined,
+      account2: string | undefined): boolean {
+      return Token.isUnresolved(account1) || Token.isUnresolved(account2) ||
+        account1 === account2;
+    }
   }
 
   public readonly grantPrincipal: IPrincipal = this;
@@ -185,30 +285,56 @@ export class Role extends Resource implements IRole {
    */
   public readonly policyFragment: PrincipalPolicyFragment;
 
+  /**
+   * Returns the permissions boundary attached to this role
+   */
+  public readonly permissionsBoundary?: IManagedPolicy;
+
   private defaultPolicy?: Policy;
-  private readonly managedPolicyArns: string[];
+  private readonly managedPolicies: IManagedPolicy[] = [];
   private readonly attachedPolicies = new AttachedPolicies();
+  private immutableRole?: IRole;
 
   constructor(scope: Construct, id: string, props: RoleProps) {
-    super(scope, id);
+    super(scope, id, {
+      physicalName: props.roleName,
+    });
 
-    this.assumeRolePolicy = createAssumeRolePolicy(props.assumedBy, props.externalId);
-    this.managedPolicyArns = props.managedPolicyArns || [ ];
+    const externalIds = props.externalIds || [];
+    if (props.externalId) {
+      externalIds.push(props.externalId);
+    }
 
-    validateMaxSessionDuration(props.maxSessionDurationSec);
+    this.assumeRolePolicy = createAssumeRolePolicy(props.assumedBy, externalIds);
+    this.managedPolicies.push(...props.managedPolicies || []);
+    this.permissionsBoundary = props.permissionsBoundary;
+    const maxSessionDuration = props.maxSessionDuration && props.maxSessionDuration.toSeconds();
+    validateMaxSessionDuration(maxSessionDuration);
+    const description = (props.description && props.description?.length > 0) ? props.description : undefined;
+
+    if (description && description.length > 1000) {
+      throw new Error('Role description must be no longer than 1000 characters.');
+    }
 
     const role = new CfnRole(this, 'Resource', {
       assumeRolePolicyDocument: this.assumeRolePolicy as any,
-      managedPolicyArns: undefinedIfEmpty(() => this.managedPolicyArns),
+      managedPolicyArns: Lazy.listValue({ produce: () => this.managedPolicies.map(p => p.managedPolicyArn) }, { omitEmpty: true }),
       policies: _flatten(props.inlinePolicies),
       path: props.path,
-      roleName: props.roleName,
-      maxSessionDuration: props.maxSessionDurationSec,
+      permissionsBoundary: this.permissionsBoundary ? this.permissionsBoundary.managedPolicyArn : undefined,
+      roleName: this.physicalName,
+      maxSessionDuration,
+      description,
     });
 
-    this.roleId = role.roleId;
-    this.roleArn = role.roleArn;
-    this.roleName = role.roleName;
+    this.roleId = role.attrRoleId;
+    this.roleArn = this.getResourceArnAttribute(role.attrArn, {
+      region: '', // IAM is global in each partition
+      service: 'iam',
+      resource: 'role',
+      resourceName: this.physicalName,
+    });
+    this.roleName = this.getResourceNameAttribute(role.ref);
     this.policyFragment = new ArnPrincipal(this.roleArn).policyFragment;
 
     function _flatten(policies?: { [name: string]: PolicyDocument }) {
@@ -229,21 +355,26 @@ export class Role extends Resource implements IRole {
    * If there is no default policy attached to this role, it will be created.
    * @param statement The permission statement to add to the policy document
    */
-  public addToPolicy(statement: PolicyStatement): boolean {
+  public addToPrincipalPolicy(statement: PolicyStatement): AddToPrincipalPolicyResult {
     if (!this.defaultPolicy) {
       this.defaultPolicy = new Policy(this, 'DefaultPolicy');
       this.attachInlinePolicy(this.defaultPolicy);
     }
-    this.defaultPolicy.addStatement(statement);
-    return true;
+    this.defaultPolicy.addStatements(statement);
+    return { statementAdded: true, policyDependable: this.defaultPolicy };
+  }
+
+  public addToPolicy(statement: PolicyStatement): boolean {
+    return this.addToPrincipalPolicy(statement).statementAdded;
   }
 
   /**
    * Attaches a managed policy to this role.
-   * @param arn The ARN of the managed policy to attach.
+   * @param policy The the managed policy to attach.
    */
-  public attachManagedPolicy(arn: string) {
-    this.managedPolicyArns.push(arn);
+  public addManagedPolicy(policy: IManagedPolicy) {
+    if (this.managedPolicies.find(mp => mp === policy)) { return; }
+    this.managedPolicies.push(policy);
   }
 
   /**
@@ -263,7 +394,7 @@ export class Role extends Resource implements IRole {
       grantee,
       actions,
       resourceArns: [this.roleArn],
-      scope: this
+      scope: this,
     });
   }
 
@@ -272,6 +403,23 @@ export class Role extends Resource implements IRole {
    */
   public grantPassRole(identity: IPrincipal) {
     return this.grant(identity, 'iam:PassRole');
+  }
+
+  /**
+   * Return a copy of this Role object whose Policies will not be updated
+   *
+   * Use the object returned by this method if you want this Role to be used by
+   * a construct without it automatically updating the Role's Policies.
+   *
+   * If you do, you are responsible for adding the correct statements to the
+   * Role's policies yourself.
+   */
+  public withoutPolicyUpdates(): IRole {
+    if (!this.immutableRole) {
+      this.immutableRole = new ImmutableRole(this.node.scope as Construct, `ImmutableRole${this.node.id}`, this);
+    }
+
+    return this.immutableRole;
   }
 }
 
@@ -304,17 +452,18 @@ export interface IRole extends IIdentity {
   grantPassRole(grantee: IPrincipal): Grant;
 }
 
-function createAssumeRolePolicy(principal: IPrincipal, externalId?: string) {
-  const statement = new PolicyStatement();
-  statement
-      .addPrincipal(principal)
-      .addAction(principal.assumeRoleAction);
+function createAssumeRolePolicy(principal: IPrincipal, externalIds: string[]) {
+  const statement = new AwsStarStatement();
+  statement.addPrincipals(principal);
+  statement.addActions(principal.assumeRoleAction);
 
-  if (externalId !== undefined) {
-    statement.addCondition('StringEquals', { 'sts:ExternalId': externalId });
+  if (externalIds.length) {
+    statement.addCondition('StringEquals', { 'sts:ExternalId': externalIds.length === 1 ? externalIds[0] : externalIds });
   }
 
-  return new PolicyDocument().addStatement(statement);
+  const doc = new PolicyDocument();
+  doc.addStatements(statement);
+  return doc;
 }
 
 function validateMaxSessionDuration(duration?: number) {
@@ -324,5 +473,23 @@ function validateMaxSessionDuration(duration?: number) {
 
   if (duration < 3600 || duration > 43200) {
     throw new Error(`maxSessionDuration is set to ${duration}, but must be >= 3600sec (1hr) and <= 43200sec (12hrs)`);
+  }
+}
+
+/**
+ * A PolicyStatement that normalizes its Principal field differently
+ *
+ * Normally, "anyone" is normalized to "Principal: *", but this statement
+ * normalizes to "Principal: { AWS: * }".
+ */
+class AwsStarStatement extends PolicyStatement {
+  public toStatementJson(): any {
+    const stat = super.toStatementJson();
+
+    if (stat.Principal === '*') {
+      stat.Principal = { AWS: '*' };
+    }
+
+    return stat;
   }
 }

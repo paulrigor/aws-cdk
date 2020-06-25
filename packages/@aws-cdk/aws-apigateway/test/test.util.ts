@@ -1,8 +1,9 @@
-import { Test } from 'nodeunit';
-import { parseAwsApiCall, parseMethodOptionsPath } from '../lib/util';
+import { Test, testCase } from 'nodeunit';
+import { JsonSchema, JsonSchemaType } from '../lib';
+import { JsonSchemaMapper, parseAwsApiCall, parseMethodOptionsPath } from '../lib/util';
 
-export = {
-  parseMethodResourcePath: {
+export = testCase({
+  'parseMethodResourcePath': {
     'fails if path does not start with a /'(test: Test) {
       test.throws(() => parseMethodOptionsPath('foo'), /Method options path must start with \'\/\'/);
       test.done();
@@ -28,10 +29,10 @@ export = {
       test.deepEqual(parseMethodOptionsPath('/*/*'),     { resourcePath: '/*', httpMethod: '*' });
       test.deepEqual(parseMethodOptionsPath('//POST'),     { resourcePath: '/', httpMethod: 'POST' });
       test.done();
-    }
+    },
   },
 
-  parseAwsApiCall: {
+  'parseAwsApiCall': {
     'fails if "actionParams" is set but "action" is undefined'(test: Test) {
       test.throws(() => parseAwsApiCall(undefined, undefined, { foo: '123' }), /"actionParams" requires that "action" will be set/);
       test.done();
@@ -60,9 +61,77 @@ export = {
     '"action" mode with parameters (url-encoded)'(test: Test) {
       test.deepEqual(parseAwsApiCall(undefined, 'GetObject', { Bucket: 'MyBucket', Key: 'MyKey' }), {
         apiType: 'action',
-        apiValue: 'GetObject&Bucket=MyBucket&Key=MyKey'
+        apiValue: 'GetObject&Bucket=MyBucket&Key=MyKey',
       });
       test.done();
-    }
-  }
-};
+    },
+  },
+
+  'JsonSchemaMapper.toCfnJsonSchema': {
+    'maps "ref" found under properties'(test: Test) {
+      const schema: JsonSchema = {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          collection: {
+            type: JsonSchemaType.ARRAY,
+            items: {
+              ref: '#/some/reference',
+            },
+            uniqueItems: true,
+          },
+        },
+        required: ['collection'],
+      };
+
+      const actual = JsonSchemaMapper.toCfnJsonSchema(schema);
+      test.deepEqual(actual, {
+        $schema: 'http://json-schema.org/draft-04/schema#',
+        type: 'object',
+        properties: {
+          collection: {
+            type: 'array',
+            items: {
+              $ref: '#/some/reference',
+            },
+            uniqueItems: true,
+          },
+        },
+        required: ['collection'],
+      });
+      test.done();
+    },
+
+    'does not map a "ref" property name'(test: Test) {
+      const schema: JsonSchema = {
+        type: JsonSchemaType.OBJECT,
+        properties: {
+          ref: {
+            type: JsonSchemaType.ARRAY,
+            items: {
+              ref: '#/some/reference',
+            },
+            uniqueItems: true,
+          },
+        },
+        required: ['ref'],
+      };
+
+      const actual = JsonSchemaMapper.toCfnJsonSchema(schema);
+      test.deepEqual(actual, {
+        $schema: 'http://json-schema.org/draft-04/schema#',
+        type: 'object',
+        properties: {
+          ref: {
+            type: 'array',
+            items: {
+              $ref: '#/some/reference',
+            },
+            uniqueItems: true,
+          },
+        },
+        required: ['ref'],
+      });
+      test.done();
+    },
+  },
+});

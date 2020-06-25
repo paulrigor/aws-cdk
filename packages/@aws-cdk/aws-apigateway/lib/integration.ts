@@ -1,6 +1,6 @@
-import iam = require('@aws-cdk/aws-iam');
+import * as iam from '@aws-cdk/aws-iam';
 import { Method } from './method';
-import { VpcLink } from './vpc-link';
+import { IVpcLink } from './vpc-link';
 
 export interface IntegrationOptions {
   /**
@@ -31,7 +31,7 @@ export interface IntegrationOptions {
    *
    * @default A role is not assumed
    */
-  readonly credentialsRole?: iam.Role;
+  readonly credentialsRole?: iam.IRole;
 
   /**
    * Requires that the caller's identity be passed through from the request.
@@ -71,7 +71,9 @@ export interface IntegrationOptions {
    * the key, and the template is the value (specified as a string), such as
    * the following snippet:
    *
-   *   { "application/json": "{\n  \"statusCode\": \"200\"\n}" }
+   * ```
+   *   { "application/json": "{ \"statusCode\": 200 }" }
+   * ```
    *
    * @see http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-mapping-template-reference.html
    */
@@ -96,7 +98,7 @@ export interface IntegrationOptions {
    * The VpcLink used for the integration.
    * Required if connectionType is VPC_LINK
    */
-  readonly vpcLink?: VpcLink;
+  readonly vpcLink?: IVpcLink;
 }
 
 export interface IntegrationProps {
@@ -111,9 +113,9 @@ export interface IntegrationProps {
    * - If you specify HTTP for the `type` property, specify the API endpoint URL.
    * - If you specify MOCK for the `type` property, don't specify this property.
    * - If you specify AWS for the `type` property, specify an AWS service that
-   *   follows this form: `arn:aws:apigateway:region:subdomain.service|service:path|action/service_api.`
+   *   follows this form: `arn:partition:apigateway:region:subdomain.service|service:path|action/service_api.`
    *   For example, a Lambda function URI follows this form:
-   *   arn:aws:apigateway:region:lambda:path/path. The path is usually in the
+   *   arn:partition:apigateway:region:lambda:path/path. The path is usually in the
    *   form /2015-03-31/functions/LambdaFunctionARN/invocations.
    *
    * @see https://docs.aws.amazon.com/apigateway/api-reference/resource/integration/#uri
@@ -139,7 +141,16 @@ export interface IntegrationProps {
  * or implement on your own by specifying the set of props.
  */
 export class Integration {
-  constructor(readonly props: IntegrationProps) { }
+  constructor(private readonly props: IntegrationProps) { }
+
+  /**
+   * Allows `Method` to access the integration props.
+   *
+   * @internal
+   */
+  public get _props() {
+    return this.props;
+  }
 
   /**
    * Can be overridden by subclasses to allow the integration to interact with the method
@@ -154,12 +165,12 @@ export enum ContentHandling {
   /**
    * Converts a request payload from a base64-encoded string to a binary blob.
    */
-  ConvertToBinary = 'CONVERT_TO_BINARY',
+  CONVERT_TO_BINARY = 'CONVERT_TO_BINARY',
 
   /**
    * Converts a request payload from a binary blob to a base64-encoded string.
    */
-  ConvertToText = 'CONVERT_TO_TEXT'
+  CONVERT_TO_TEXT = 'CONVERT_TO_TEXT'
 }
 
 export enum IntegrationType {
@@ -170,34 +181,34 @@ export enum IntegrationType {
    * integration. With any other AWS service action, this is known as AWS
    * integration.
    */
-  Aws = 'AWS',
+  AWS = 'AWS',
 
   /**
    * For integrating the API method request with the Lambda function-invoking
    * action with the client request passed through as-is. This integration is
    * also referred to as the Lambda proxy integration
    */
-  AwsProxy = 'AWS_PROXY',
+  AWS_PROXY = 'AWS_PROXY',
 
   /**
    * For integrating the API method request with an HTTP endpoint, including a
    * private HTTP endpoint within a VPC. This integration is also referred to
    * as the HTTP custom integration.
    */
-  Http = 'HTTP',
+  HTTP = 'HTTP',
 
   /**
    * For integrating the API method request with an HTTP endpoint, including a
    * private HTTP endpoint within a VPC, with the client request passed
    * through as-is. This is also referred to as the HTTP proxy integration
    */
-  HttpProxy = 'HTTP_PROXY',
+  HTTP_PROXY = 'HTTP_PROXY',
 
   /**
    * For integrating the API method request with API Gateway as a "loop-back"
    * endpoint without invoking any backend.
    */
-  Mock = 'MOCK'
+  MOCK = 'MOCK'
 }
 
 export enum PassthroughBehavior {
@@ -205,32 +216,32 @@ export enum PassthroughBehavior {
    * Passes the request body for unmapped content types through to the
    * integration back end without transformation.
    */
-  WhenNoMatch = 'WHEN_NO_MATCH',
+  WHEN_NO_MATCH = 'WHEN_NO_MATCH',
 
   /**
    * Rejects unmapped content types with an HTTP 415 'Unsupported Media Type'
    * response
    */
-  Never = 'NEVER',
+  NEVER = 'NEVER',
 
   /**
    * Allows pass-through when the integration has NO content types mapped to
    * templates. However if there is at least one content type defined,
    * unmapped content types will be rejected with the same 415 response.
    */
-  WhenNoTemplates = 'WHEN_NO_TEMPLATES'
+  WHEN_NO_TEMPLATES = 'WHEN_NO_TEMPLATES'
 }
 
 export enum ConnectionType {
   /**
    * For connections through the public routable internet
    */
-  Internet = 'INTERNET',
+  INTERNET = 'INTERNET',
 
   /**
    * For private connections between API Gateway and a network load balancer in a VPC
    */
-  VpcLink = 'VPC_LINK'
+  VPC_LINK = 'VPC_LINK'
 }
 
 export interface IntegrationResponse {

@@ -1,8 +1,10 @@
-import codebuild = require('@aws-cdk/aws-codebuild');
-import codecommit = require('@aws-cdk/aws-codecommit');
-import codepipeline = require('@aws-cdk/aws-codepipeline');
-import cdk = require('@aws-cdk/cdk');
-import cpactions = require('../lib');
+import * as codebuild from '@aws-cdk/aws-codebuild';
+import * as codecommit from '@aws-cdk/aws-codecommit';
+import * as codepipeline from '@aws-cdk/aws-codepipeline';
+import * as cdk from '@aws-cdk/core';
+import * as cpactions from '../lib';
+
+// tslint:disable:object-literal-key-quotes
 
 const app = new cdk.App();
 
@@ -16,17 +18,26 @@ const sourceAction = new cpactions.CodeCommitSourceAction({
   actionName: 'source',
   output: sourceOutput,
   repository,
-  pollForSourceChanges: true,
+  trigger: cpactions.CodeCommitTrigger.POLL,
 });
 
-const project = new codebuild.Project(stack, 'MyBuildProject', {
-  source: new codebuild.CodePipelineSource(),
+const project = new codebuild.PipelineProject(stack, 'MyBuildProject', {
+  grantReportGroupPermissions: false,
 });
 const buildAction = new cpactions.CodeBuildAction({
   actionName: 'build',
   project,
   input: sourceOutput,
-  output: new codepipeline.Artifact(),
+  outputs: [new codepipeline.Artifact()],
+  environmentVariables: {
+    'TEST_ENV_VARIABLE': {
+      value: 'test env variable value',
+    },
+    'PARAM_STORE_VARIABLE': {
+      value: 'param_store',
+      type: codebuild.BuildEnvironmentVariableType.PARAMETER_STORE,
+    },
+  },
 });
 const testAction = new cpactions.CodeBuildAction({
   type: cpactions.CodeBuildActionType.TEST,
@@ -38,12 +49,12 @@ const testAction = new cpactions.CodeBuildAction({
 new codepipeline.Pipeline(stack, 'Pipeline', {
   stages: [
     {
-      name: 'source',
+      stageName: 'source',
       actions: [sourceAction],
     },
   ],
 }).addStage({
-  name: 'build',
+  stageName: 'build',
   actions: [
     buildAction,
     testAction,

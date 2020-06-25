@@ -1,5 +1,5 @@
 import { expect, haveResource } from '@aws-cdk/assert';
-import { Stack } from '@aws-cdk/cdk';
+import { Duration, Stack } from '@aws-cdk/core';
 import { Test } from 'nodeunit';
 import { Bucket, StorageClass } from '../lib';
 
@@ -11,8 +11,8 @@ export = {
     // WHEN
     new Bucket(stack, 'Bucket', {
       lifecycleRules: [{
-        expirationInDays: 30
-      }]
+        expiration: Duration.days(30),
+      }],
     });
 
     // THEN
@@ -20,9 +20,9 @@ export = {
       LifecycleConfiguration: {
         Rules: [{
           ExpirationInDays: 30,
-          Status: "Enabled"
-        }]
-      }
+          Status: 'Enabled',
+        }],
+      },
     }));
 
     test.done();
@@ -35,7 +35,7 @@ export = {
     // WHEN
     const bucket = new Bucket(stack, 'Bucket');
     bucket.addLifecycleRule({
-      expirationInDays: 30
+      expiration: Duration.days(30),
     });
 
     // THEN
@@ -43,9 +43,9 @@ export = {
       LifecycleConfiguration: {
         Rules: [{
           ExpirationInDays: 30,
-          Status: "Enabled"
-        }]
-      }
+          Status: 'Enabled',
+        }],
+      },
     }));
 
     test.done();
@@ -58,8 +58,8 @@ export = {
     // WHEN
     new Bucket(stack, 'Bucket', {
       lifecycleRules: [{
-        expirationDate: new Date('2018-01-01')
-      }]
+        expirationDate: new Date('2018-01-01'),
+      }],
     });
 
     // THEN
@@ -67,9 +67,9 @@ export = {
       LifecycleConfiguration: {
         Rules: [{
           ExpirationDate: '2018-01-01T00:00:00',
-          Status: "Enabled"
-        }]
-      }
+          Status: 'Enabled',
+        }],
+      },
     }));
 
     test.done();
@@ -83,10 +83,10 @@ export = {
     new Bucket(stack, 'Bucket', {
       lifecycleRules: [{
         transitions: [{
-          storageClass: StorageClass.Glacier,
-          transitionInDays: 30
-        }]
-      }]
+          storageClass: StorageClass.GLACIER,
+          transitionAfter: Duration.days(30),
+        }],
+      }],
     });
 
     // THEN
@@ -95,11 +95,11 @@ export = {
         Rules: [{
           Transitions: [{
             StorageClass: 'GLACIER',
-            TransitionInDays: 30
+            TransitionInDays: 30,
           }],
-          Status: "Enabled"
-        }]
-      }
+          Status: 'Enabled',
+        }],
+      },
     }));
 
     test.done();
@@ -113,8 +113,8 @@ export = {
     test.throws(() => {
       new Bucket(stack, 'Bucket1', {
         lifecycleRules: [{
-          noncurrentVersionExpirationInDays: 10
-        }]
+          noncurrentVersionExpiration: Duration.days(10),
+        }],
       });
     });
 
@@ -122,8 +122,8 @@ export = {
     new Bucket(stack, 'Bucket2', {
       versioned: true,
       lifecycleRules: [{
-        noncurrentVersionExpirationInDays: 10
-      }]
+        noncurrentVersionExpiration: Duration.days(10),
+      }],
     });
 
     test.done();

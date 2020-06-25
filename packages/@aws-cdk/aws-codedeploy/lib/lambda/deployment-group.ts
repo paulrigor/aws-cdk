@@ -1,7 +1,7 @@
-import cloudwatch = require('@aws-cdk/aws-cloudwatch');
-import iam = require('@aws-cdk/aws-iam');
-import lambda = require('@aws-cdk/aws-lambda');
-import cdk = require('@aws-cdk/cdk');
+import * as cloudwatch from '@aws-cdk/aws-cloudwatch';
+import * as iam from '@aws-cdk/aws-iam';
+import * as lambda from '@aws-cdk/aws-lambda';
+import * as cdk from '@aws-cdk/core';
 
 import { CfnDeploymentGroup } from '../codedeploy.generated';
 import { AutoRollbackConfig } from '../rollback-config';
@@ -29,6 +29,11 @@ export interface ILambdaDeploymentGroup extends cdk.IResource {
    * @attribute
    */
   readonly deploymentGroupArn: string;
+
+  /**
+   * The Deployment Configuration this Group uses.
+   */
+  readonly deploymentConfig: ILambdaDeploymentConfig;
 }
 
 /**
@@ -52,7 +57,7 @@ export interface LambdaDeploymentGroupProps {
   /**
    * The Deployment Configuration this Deployment Group uses.
    *
-   * @default LambdaDeploymentConfig#AllAtOnce
+   * @default LambdaDeploymentConfig.CANARY_10PERCENT_5MINUTES
    */
   readonly deploymentConfig?: ILambdaDeploymentConfig;
 
@@ -117,8 +122,7 @@ export interface LambdaDeploymentGroupProps {
  */
 export class LambdaDeploymentGroup extends cdk.Resource implements ILambdaDeploymentGroup {
   /**
-   * Import an Lambda Deployment Group defined either outside the CDK,
-   * or in a different CDK Stack and exported using the {@link #export} method.
+   * Import an Lambda Deployment Group defined either outside the CDK app, or in a different AWS region.
    *
    * @param scope the parent Construct for this new Construct
    * @param id the logical ID of this new Construct
@@ -126,15 +130,16 @@ export class LambdaDeploymentGroup extends cdk.Resource implements ILambdaDeploy
    * @returns a Construct representing a reference to an existing Deployment Group
    */
   public static fromLambdaDeploymentGroupAttributes(
-      scope: cdk.Construct,
-      id: string,
-      attrs: LambdaDeploymentGroupAttributes): ILambdaDeploymentGroup {
+    scope: cdk.Construct,
+    id: string,
+    attrs: LambdaDeploymentGroupAttributes): ILambdaDeploymentGroup {
     return new ImportedLambdaDeploymentGroup(scope, id, attrs);
   }
 
   public readonly application: ILambdaApplication;
   public readonly deploymentGroupName: string;
   public readonly deploymentGroupArn: string;
+  public readonly deploymentConfig: ILambdaDeploymentConfig;
   public readonly role: iam.IRole;
 
   private readonly alarms: cloudwatch.IAlarm[];
@@ -142,32 +147,40 @@ export class LambdaDeploymentGroup extends cdk.Resource implements ILambdaDeploy
   private postHook?: lambda.IFunction;
 
   constructor(scope: cdk.Construct, id: string, props: LambdaDeploymentGroupProps) {
-    super(scope, id);
+    super(scope, id, {
+      physicalName: props.deploymentGroupName,
+    });
 
     this.application = props.application || new LambdaApplication(this, 'Application');
     this.alarms = props.alarms || [];
 
     this.role = props.role || new iam.Role(this, 'ServiceRole', {
-      assumedBy: new iam.ServicePrincipal('codedeploy.amazonaws.com')
+      assumedBy: new iam.ServicePrincipal('codedeploy.amazonaws.com'),
     });
 
-    this.role.attachManagedPolicy('arn:aws:iam::aws:policy/service-role/AWSCodeDeployRoleForLambda');
+    this.role.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSCodeDeployRoleForLambda'));
+    this.deploymentConfig = props.deploymentConfig || LambdaDeploymentConfig.CANARY_10PERCENT_5MINUTES;
 
     const resource = new CfnDeploymentGroup(this, 'Resource', {
       applicationName: this.application.applicationName,
       serviceRoleArn: this.role.roleArn,
-      deploymentGroupName: props.deploymentGroupName,
-      deploymentConfigName: (props.deploymentConfig || LambdaDeploymentConfig.AllAtOnce).deploymentConfigName,
+      deploymentGroupName: this.physicalName,
+      deploymentConfigName: this.deploymentConfig.deploymentConfigName,
       deploymentStyle: {
         deploymentType: 'BLUE_GREEN',
-        deploymentOption: 'WITH_TRAFFIC_CONTROL'
+        deploymentOption: 'WITH_TRAFFIC_CONTROL',
       },
-      alarmConfiguration: new cdk.Token(() => renderAlarmConfiguration(this.alarms, props.ignorePollAlarmsFailure)),
-      autoRollbackConfiguration: new cdk.Token(() => renderAutoRollbackConfiguration(this.alarms, props.autoRollback)),
+      alarmConfiguration: cdk.Lazy.anyValue({ produce: () => renderAlarmConfiguration(this.alarms, props.ignorePollAlarmsFailure) }),
+      autoRollbackConfiguration: cdk.Lazy.anyValue({ produce: () => renderAutoRollbackConfiguration(this.alarms, props.autoRollback) }),
     });
 
-    this.deploymentGroupName = resource.deploymentGroupName;
-    this.deploymentGroupArn = arnForDeploymentGroup(this.application.applicationName, this.deploymentGroupName);
+    this.deploymentGroupName = this.getResourceNameAttribute(resource.ref);
+    this.deploymentGroupArn = this.getResourceArnAttribute(arnForDeploymentGroup(this.application.applicationName, resource.ref), {
+      service: 'codedeploy',
+      resource: 'deploymentgroup',
+      resourceName: `${this.application.applicationName}/${this.physicalName}`,
+      sep: ':',
+    });
 
     if (props.preHook) {
       this.addPreHook(props.preHook);
@@ -176,13 +189,13 @@ export class LambdaDeploymentGroup extends cdk.Resource implements ILambdaDeploy
       this.addPostHook(props.postHook);
     }
 
-    (props.alias.node.findChild('Resource') as lambda.CfnAlias).options.updatePolicy = {
+    (props.alias.node.defaultChild as lambda.CfnAlias).cfnOptions.updatePolicy = {
       codeDeployLambdaAliasUpdate: {
         applicationName: this.application.applicationName,
-        deploymentGroupName: resource.deploymentGroupName,
-        beforeAllowTrafficHook: new cdk.Token(() => this.preHook === undefined ? undefined : this.preHook.functionName).toString(),
-        afterAllowTrafficHook: new cdk.Token(() => this.postHook === undefined ? undefined : this.postHook.functionName).toString()
-      }
+        deploymentGroupName: resource.ref,
+        beforeAllowTrafficHook: cdk.Lazy.stringValue({ produce: () => this.preHook && this.preHook.functionName }),
+        afterAllowTrafficHook: cdk.Lazy.stringValue({ produce: () => this.postHook && this.postHook.functionName }),
+      },
     };
   }
 
@@ -240,8 +253,7 @@ export class LambdaDeploymentGroup extends cdk.Resource implements ILambdaDeploy
 /**
  * Properties of a reference to a CodeDeploy Lambda Deployment Group.
  *
- * @see LambdaDeploymentGroup#import
- * @see ILambdaDeploymentGroup#export
+ * @see LambdaDeploymentGroup#fromLambdaDeploymentGroupAttributes
  */
 export interface LambdaDeploymentGroupAttributes {
   /**
@@ -255,17 +267,26 @@ export interface LambdaDeploymentGroupAttributes {
    * that we are referencing.
    */
   readonly deploymentGroupName: string;
+
+  /**
+   * The Deployment Configuration this Deployment Group uses.
+   *
+   * @default LambdaDeploymentConfig.CANARY_10PERCENT_5MINUTES
+   */
+  readonly deploymentConfig?: ILambdaDeploymentConfig;
 }
 
-class ImportedLambdaDeploymentGroup extends cdk.Construct implements ILambdaDeploymentGroup {
+class ImportedLambdaDeploymentGroup extends cdk.Resource implements ILambdaDeploymentGroup {
   public readonly application: ILambdaApplication;
   public readonly deploymentGroupName: string;
   public readonly deploymentGroupArn: string;
+  public readonly deploymentConfig: ILambdaDeploymentConfig;
 
   constructor(scope: cdk.Construct, id: string, props: LambdaDeploymentGroupAttributes) {
     super(scope, id);
     this.application = props.application;
     this.deploymentGroupName = props.deploymentGroupName;
     this.deploymentGroupArn = arnForDeploymentGroup(props.application.applicationName, props.deploymentGroupName);
+    this.deploymentConfig = props.deploymentConfig || LambdaDeploymentConfig.CANARY_10PERCENT_5MINUTES;
   }
 }

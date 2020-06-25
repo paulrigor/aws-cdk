@@ -1,13 +1,14 @@
 ## Amazon Relational Database Service Construct Library
 <!--BEGIN STABILITY BANNER-->
-
 ---
 
-![Stability: Experimental](https://img.shields.io/badge/stability-Experimental-important.svg?style=for-the-badge)
+![cfn-resources: Stable](https://img.shields.io/badge/cfn--resources-stable-success.svg?style=for-the-badge)
 
-> This API is still under active development and subject to non-backward
-> compatible changes or removal in any future version. Use of the API is not recommended in production
-> environments. Experimental APIs are not subject to the Semantic Versioning model.
+> All classes with the `Cfn` prefix in this module ([CFN Resources](https://docs.aws.amazon.com/cdk/latest/guide/constructs.html#constructs_lib)) are always stable and safe to use.
+
+![cdk-constructs: Experimental](https://img.shields.io/badge/cdk--constructs-experimental-important.svg?style=for-the-badge)
+
+> The APIs of higher level constructs in this module are experimental and under active development. They are subject to non-backward compatible changes or removal in any future version. These are not subject to the [Semantic Versioning](https://semver.org/) model and breaking changes will be announced in the release notes. This means that while you may use them, you may need to update your source code when upgrading to a newer version of this package.
 
 ---
 <!--END STABILITY BANNER-->
@@ -20,20 +21,20 @@ your instances will be launched privately or publicly:
 
 ```ts
 const cluster = new DatabaseCluster(this, 'Database', {
-    engine: DatabaseClusterEngine.Aurora,
+    engine: DatabaseClusterEngine.AURORA,
     masterUser: {
-        username: 'admin'
+        username: 'clusteradmin'
     },
     instanceProps: {
-        instanceType: new InstanceTypePair(InstanceClass.Burstable2, InstanceSize.Small),
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.SMALL),
         vpcSubnets: {
-            subnetType: ec2.SubnetType.Public,
+            subnetType: ec2.SubnetType.PRIVATE,
         },
         vpc
     }
 });
 ```
-By default, the master password will be generated and stored in AWS Secrets Manager.
+By default, the master password will be generated and stored in AWS Secrets Manager with auto-generated description.
 
 Your cluster will be empty by default. To add a default database upon construction, specify the
 `defaultDatabaseName` attribute.
@@ -45,13 +46,28 @@ your instances will be launched privately or publicly:
 
 ```ts
 const instance = new DatabaseInstance(stack, 'Instance', {
-    engine: rds.DatabaseInstanceEngine.OracleSE1,
-    instanceClass: new ec2.InstanceTypePair(ec2.InstanceClass.Burstable2, ec2.InstanceSize.Small),
+    engine: rds.DatabaseInstanceEngine.ORACLE_SE1,
+    instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.SMALL),
     masterUsername: 'syscdk',
     vpc
 });
 ```
 By default, the master password will be generated and stored in AWS Secrets Manager.
+
+To use the storage auto scaling option of RDS you can specify the maximum allocated storage.
+This is the upper limit to which RDS can automatically scale the storage. More info can be found
+[here](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PIOPS.StorageTypes.html#USER_PIOPS.Autoscaling)
+Example for max storage configuration:
+
+```ts
+const instance = new DatabaseInstance(stack, 'Instance', {
+    engine: rds.DatabaseInstanceEngine.ORACLE_SE1,
+    instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.SMALL),
+    masterUsername: 'syscdk',
+    vpc,
+    maxAllocatedStorage: 200
+});
+```
 
 Use `DatabaseInstanceFromSnapshot` and `DatabaseInstanceReadReplica` to create an instance from snapshot or
 a source database respectively:
@@ -59,18 +75,18 @@ a source database respectively:
 ```ts
 new DatabaseInstanceFromSnapshot(stack, 'Instance', {
     snapshotIdentifier: 'my-snapshot',
-    engine: rds.DatabaseInstanceEngine.Postgres,
-    instanceClass: new ec2.InstanceTypePair(ec2.InstanceClass.Burstable2, ec2.InstanceSize.Large),
+    engine: rds.DatabaseInstanceEngine.POSTGRES,
+    instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.LARGE),
     vpc
 });
 
 new DatabaseInstanceReadReplica(stack, 'ReadReplica', {
     sourceDatabaseInstance: sourceInstance,
-    engine: rds.DatabaseInstanceEngine.Postgres,
-    instanceClass: new ec2.InstanceTypePair(ec2.InstanceClass.Burstable2, ec2.InstanceSize.Large),
+    instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.LARGE),
     vpc
 });
 ```
+
 Creating a "production" Oracle database instance with option and parameter groups:
 
 [example of setting up a production oracle instance](test/integ.instance.lit.ts)
@@ -105,32 +121,37 @@ For an instance database:
 const address = instance.instanceEndpoint.socketAddress;   // "HOSTNAME:PORT"
 ```
 
-### Rotating master password
+### Rotating credentials
 When the master password is generated and stored in AWS Secrets Manager, it can be rotated automatically:
+```ts
+instance.addRotationSingleUser(); // Will rotate automatically after 30 days
+```
 
 [example of setting up master password rotation for a cluster](test/integ.cluster-rotation.lit.ts)
 
-Rotation of the master password is also supported for an existing cluster:
+The multi user rotation scheme is also available:
 ```ts
-new SecretRotation(stack, 'Rotation', {
-    secret: importedSecret,
-    application: SecretRotationApplication.OracleRotationSingleUser
-    target: importedCluster, // or importedInstance
-    vpc: importedVpc,
-})
+instance.addRotationMultiUser('MyUser', {
+  secret: myImportedSecret // This secret must have the `masterarn` key
+});
 ```
 
-The `importedSecret` must be a JSON string with the following format:
-```json
-{
-  "engine": "<required: database engine>",
-  "host": "<required: instance host name>",
-  "username": "<required: username>",
-  "password": "<required: password>",
-  "dbname": "<optional: database name>",
-  "port": "<optional: if not specified, default port will be used>"
-}
+It's also possible to create user credentials together with the instance/cluster and add rotation:
+```ts
+const myUserSecret = new rds.DatabaseSecret(this, 'MyUserSecret', {
+  username: 'myuser'
+  masterSecret: instance.secret
+});
+const myUserSecretAttached = myUserSecret.attach(instance); // Adds DB connections information in the secret
+
+instance.addRotationMultiUser('MyUser', { // Add rotation using the multi user scheme
+  secret: myUserSecretAttached
+});
 ```
+**Note**: This user must be created manually in the database using the master credentials.
+The rotation will start as soon as this user exists.
+
+See also [@aws-cdk/aws-secretsmanager](https://github.com/aws/aws-cdk/blob/master/packages/%40aws-cdk/aws-secretsmanager/README.md) for credentials rotation of existing clusters/instances.
 
 ### Metrics
 Database instances expose metrics (`cloudwatch.Metric`):
@@ -140,4 +161,31 @@ const dbConnections = instance.metricDatabaseConnections();
 
 // The average amount of time taken per disk I/O operation (average over 1 minute)
 const readLatency = instance.metric('ReadLatency', { statistic: 'Average', periodSec: 60 });
+```
+
+### Enabling S3 integration to a cluster (non-serverless Aurora only)
+
+Data in S3 buckets can be imported to and exported from Aurora databases using SQL queries. To enable this
+functionality, set the `s3ImportBuckets` and `s3ExportBuckets` properties for import and export respectively. When
+configured, the CDK automatically creates and configures IAM roles as required.
+Additionally, the `s3ImportRole` and `s3ExportRole` properties can be used to set this role directly.
+
+For Aurora MySQL, read more about [loading data from
+S3](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Integrating.LoadFromS3.html) and [saving
+data into S3](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Integrating.SaveIntoS3.html).
+
+For Aurora PostgreSQL, read more about [loading data from
+S3](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Migrating.html) and [saving 
+data into S3](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/postgresql-s3-export.html).
+
+The following snippet sets up a database cluster with different S3 buckets where the data is imported and exported - 
+
+```ts
+const importBucket = new s3.Bucket(this, 'importbucket');
+const exportBucket = new s3.Bucket(this, 'exportbucket');
+new DatabaseCluster(this, 'dbcluster', {
+    // ...
+    s3ImportBuckets: [ importBucket ],
+    s3ExportBuckets: [ exportBucket ]
+});
 ```

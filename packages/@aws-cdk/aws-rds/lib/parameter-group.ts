@@ -1,4 +1,4 @@
-import { Construct, IResource, Resource } from '@aws-cdk/cdk';
+import { Construct, IResource, Lazy, Resource } from '@aws-cdk/core';
 import { CfnDBClusterParameterGroup, CfnDBParameterGroup } from './rds.generated';
 
 /**
@@ -7,16 +7,8 @@ import { CfnDBClusterParameterGroup, CfnDBParameterGroup } from './rds.generated
 export interface IParameterGroup extends IResource {
   /**
    * The name of this parameter group
-   */
-  readonly parameterGroupName: string;
-}
-
-/**
- * Reference to an existing parameter group
- */
-export interface ParameterGroupAttributes {
-  /**
-   * The name of the parameter group
+   *
+   * @attribute
    */
   readonly parameterGroupName: string;
 }
@@ -29,7 +21,7 @@ abstract class ParameterGroupBase extends Resource implements IParameterGroup {
    * Imports a parameter group
    */
   public static fromParameterGroupName(scope: Construct, id: string, parameterGroupName: string): IParameterGroup {
-    class Import extends Construct implements IParameterGroup {
+    class Import extends Resource implements IParameterGroup {
       public readonly parameterGroupName = parameterGroupName;
     }
     return new Import(scope, id);
@@ -39,6 +31,24 @@ abstract class ParameterGroupBase extends Resource implements IParameterGroup {
    * The name of the parameter group
    */
   public abstract readonly parameterGroupName: string;
+
+  /**
+   * Parameters of the parameter group
+   */
+  protected parameters?: { [key: string]: string } = {};
+
+  /**
+   * Add a parameter to this parameter group
+   *
+   * @param key The key of the parameter to be added
+   * @param value The value of the parameter to be added
+   */
+  public addParameter(key: string, value: string) {
+    if (!this.parameters) {
+      this.parameters = {};
+    }
+    this.parameters[key] = value;
+  }
 }
 
 /**
@@ -59,8 +69,10 @@ export interface ParameterGroupProps {
 
   /**
    * The parameters in this parameter group
+   *
+   * @default - None
    */
-  readonly parameters: { [key: string]: string };
+  readonly parameters?: { [key: string]: string };
 }
 
 /**
@@ -77,13 +89,15 @@ export class ParameterGroup extends ParameterGroupBase {
   constructor(scope: Construct, id: string, props: ParameterGroupProps) {
     super(scope, id);
 
+    this.parameters = props.parameters ? props.parameters : {};
+
     const resource = new CfnDBParameterGroup(this, 'Resource', {
       description: props.description || `Parameter group for ${props.family}`,
       family: props.family,
-      parameters: props.parameters,
+      parameters: Lazy.anyValue({ produce: () => this.parameters }),
     });
 
-    this.parameterGroupName = resource.dbParameterGroupName;
+    this.parameterGroupName = resource.ref;
   }
 }
 
@@ -108,12 +122,14 @@ export class ClusterParameterGroup extends ParameterGroupBase {
   constructor(scope: Construct, id: string, props: ClusterParameterGroupProps) {
     super(scope, id);
 
+    this.parameters = props.parameters ? props.parameters : {};
+
     const resource = new CfnDBClusterParameterGroup(this, 'Resource', {
       description: props.description || `Cluster parameter group for ${props.family}`,
       family: props.family,
-      parameters: props.parameters,
+      parameters: Lazy.anyValue({ produce: () => this.parameters }),
     });
 
-    this.parameterGroupName = resource.dbClusterParameterGroupName;
+    this.parameterGroupName = resource.ref;
   }
 }

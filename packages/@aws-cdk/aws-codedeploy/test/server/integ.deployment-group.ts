@@ -1,9 +1,9 @@
-import autoscaling = require('@aws-cdk/aws-autoscaling');
-import cloudwatch = require('@aws-cdk/aws-cloudwatch');
-import ec2 = require('@aws-cdk/aws-ec2');
-import lb = require('@aws-cdk/aws-elasticloadbalancing');
-import cdk = require('@aws-cdk/cdk');
-import codedeploy = require('../../lib');
+import * as autoscaling from '@aws-cdk/aws-autoscaling';
+import * as cloudwatch from '@aws-cdk/aws-cloudwatch';
+import * as ec2 from '@aws-cdk/aws-ec2';
+import * as lb from '@aws-cdk/aws-elasticloadbalancing';
+import * as cdk from '@aws-cdk/core';
+import * as codedeploy from '../../lib';
 
 const app = new cdk.App();
 
@@ -12,7 +12,7 @@ const stack = new cdk.Stack(app, 'aws-cdk-codedeploy-server-dg');
 const vpc = new ec2.Vpc(stack, 'VPC');
 
 const asg = new autoscaling.AutoScalingGroup(stack, 'ASG', {
-  instanceType: new ec2.InstanceTypePair(ec2.InstanceClass.M5, ec2.InstanceSize.Large),
+  instanceType: ec2.InstanceType.of(ec2.InstanceClass.M5, ec2.InstanceSize.LARGE),
   machineImage: new ec2.AmazonLinuxImage(),
   vpc,
 });
@@ -23,7 +23,7 @@ elb.addListener({
 });
 
 new codedeploy.ServerDeploymentGroup(stack, 'CodeDeployGroup', {
-  deploymentConfig: codedeploy.ServerDeploymentConfig.AllAtOnce,
+  deploymentConfig: codedeploy.ServerDeploymentConfig.ALL_AT_ONCE,
   autoScalingGroups: [asg],
   loadBalancer: codedeploy.LoadBalancer.classic(elb),
   alarms: [

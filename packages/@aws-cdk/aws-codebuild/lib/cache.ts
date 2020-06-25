@@ -1,7 +1,7 @@
-import { IBucket } from "@aws-cdk/aws-s3";
-import { Aws, Fn } from "@aws-cdk/cdk";
-import { CfnProject } from "./codebuild.generated";
-import { IProject } from "./project";
+import { IBucket } from '@aws-cdk/aws-s3';
+import { Aws, Fn } from '@aws-cdk/core';
+import { CfnProject } from './codebuild.generated';
+import { IProject } from './project';
 
 export interface BucketCacheOptions {
   /**
@@ -17,17 +17,17 @@ export enum LocalCacheMode {
   /**
    * Caches Git metadata for primary and secondary sources
    */
-  Source = 'LOCAL_SOURCE_CACHE',
+  SOURCE = 'LOCAL_SOURCE_CACHE',
 
   /**
    * Caches existing Docker layers
    */
-  DockerLayer = 'LOCAL_DOCKER_LAYER_CACHE',
+  DOCKER_LAYER = 'LOCAL_DOCKER_LAYER_CACHE',
 
   /**
    * Caches directories you specify in the buildspec file
    */
-  Custom = 'LOCAL_CUSTOM_CACHE',
+  CUSTOM = 'LOCAL_CUSTOM_CACHE',
 }
 
 /**
@@ -48,9 +48,9 @@ export abstract class Cache {
     return {
       _toCloudFormation: () => ({
         type: 'LOCAL',
-        modes
+        modes,
       }),
-      _bind: () => { return; }
+      _bind: () => { return; },
     };
   }
 
@@ -63,11 +63,11 @@ export abstract class Cache {
     return {
       _toCloudFormation: () => ({
         type: 'S3',
-        location: Fn.join('/', [bucket.bucketName, options && options.prefix || Aws.noValue])
+        location: Fn.join('/', [bucket.bucketName, options && options.prefix || Aws.NO_VALUE]),
       }),
       _bind: (project) => {
         bucket.grantReadWrite(project);
-      }
+      },
     };
   }
 

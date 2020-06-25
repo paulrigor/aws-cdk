@@ -1,8 +1,8 @@
 import { expect, haveResource } from '@aws-cdk/assert';
-import lambda = require('@aws-cdk/aws-lambda');
-import cdk = require('@aws-cdk/cdk');
+import * as lambda from '@aws-cdk/aws-lambda';
+import * as cdk from '@aws-cdk/core';
 import { Test } from 'nodeunit';
-import secretsmanager = require('../lib');
+import * as secretsmanager from '../lib';
 
 export = {
   'create a rotation schedule'(test: Test) {
@@ -10,31 +10,31 @@ export = {
     const stack = new cdk.Stack();
     const secret = new secretsmanager.Secret(stack, 'Secret');
     const rotationLambda = new lambda.Function(stack, 'Lambda', {
-      runtime: lambda.Runtime.NodeJS810,
-      code: lambda.Code.inline('export.handler = event => event;'),
-      handler: 'index.handler'
+      runtime: lambda.Runtime.NODEJS_10_X,
+      code: lambda.Code.fromInline('export.handler = event => event;'),
+      handler: 'index.handler',
     });
 
     // WHEN
     new secretsmanager.RotationSchedule(stack, 'RotationSchedule', {
       secret,
-      rotationLambda
+      rotationLambda,
     });
 
     // THEN
     expect(stack).to(haveResource('AWS::SecretsManager::RotationSchedule', {
       SecretId: {
-        Ref: 'SecretA720EF05'
+        Ref: 'SecretA720EF05',
       },
       RotationLambdaARN: {
         'Fn::GetAtt': [
           'LambdaD247545B',
-          'Arn'
-        ]
+          'Arn',
+        ],
       },
       RotationRules: {
-        AutomaticallyAfterDays: 30
-      }
+        AutomaticallyAfterDays: 30,
+      },
     }));
 
     test.done();

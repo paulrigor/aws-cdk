@@ -1,7 +1,7 @@
-import { Construct, DeletionPolicy, Resource, Stack, Token } from '@aws-cdk/cdk';
-import crypto = require('crypto');
-import { CfnDeployment, CfnDeploymentProps } from './apigateway.generated';
-import { IRestApi } from './restapi';
+import { CfnResource, Construct, Lazy, RemovalPolicy, Resource, Stack } from '@aws-cdk/core';
+import * as crypto from 'crypto';
+import { CfnDeployment } from './apigateway.generated';
+import { IRestApi, RestApi, SpecRestApi } from './restapi';
 
 export interface DeploymentProps  {
   /**
@@ -18,7 +18,7 @@ export interface DeploymentProps  {
 
   /**
    * When an API Gateway model is updated, a new deployment will automatically be created.
-   * If this is true (default), the old API Gateway Deployment resource will not be deleted.
+   * If this is true, the old API Gateway Deployment resource will not be deleted.
    * This will allow manually reverting back to a previous deployment in case for example
    *
    * @default false
@@ -68,15 +68,15 @@ export class Deployment extends Resource {
 
     this.resource = new LatestDeploymentResource(this, 'Resource', {
       description: props.description,
-      restApiId: props.api.restApiId,
+      restApi: props.api,
     });
 
     if (props.retainDeployments) {
-      this.resource.options.deletionPolicy = DeletionPolicy.Retain;
+      this.resource.applyRemovalPolicy(RemovalPolicy.RETAIN);
     }
 
     this.api = props.api;
-    this.deploymentId = new Token(() => this.resource.deploymentId).toString();
+    this.deploymentId = Lazy.stringValue({ produce: () => this.resource.ref });
   }
 
   /**
@@ -90,16 +90,50 @@ export class Deployment extends Resource {
   public addToLogicalId(data: any) {
     this.resource.addToLogicalId(data);
   }
+
+  /**
+   * Hook into synthesis before it occurs and make any final adjustments.
+   */
+  protected prepare() {
+    if (this.api instanceof RestApi) {
+      // Ignore IRestApi that are imported
+
+      /*
+       * https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-apigateway-deployment.html
+       * Quoting from CloudFormation's docs - "If you create an AWS::ApiGateway::RestApi resource and its methods (using AWS::ApiGateway::Method) in
+       * the same template as your deployment, the deployment must depend on the RestApi's methods. To create a dependency, add a DependsOn attribute
+       * to the deployment. If you don't, AWS CloudFormation creates the deployment right after it creates the RestApi resource that doesn't contain
+       * any methods, and AWS CloudFormation encounters the following error: The REST API doesn't contain any methods."
+       */
+
+      /*
+       * Adding a dependency between LatestDeployment and Method construct, using ConstructNode.addDependencies(), creates additional dependencies
+       * between AWS::ApiGateway::Deployment and the AWS::Lambda::Permission nodes (children under Method), causing cyclic dependency errors. Hence,
+       * falling back to declaring dependencies between the underlying CfnResources.
+       */
+      this.api.methods.map(m => m.node.defaultChild as CfnResource).forEach(m => this.resource.addDependsOn(m));
+    }
+  }
+}
+
+interface LatestDeploymentResourceProps {
+  readonly description?: string;
+  readonly restApi: IRestApi;
 }
 
 class LatestDeploymentResource extends CfnDeployment {
   private hashComponents = new Array<any>();
   private originalLogicalId: string;
+  private api: IRestApi;
 
-  constructor(scope: Construct, id: string, props: CfnDeploymentProps) {
-    super(scope, id, props);
+  constructor(scope: Construct, id: string, props: LatestDeploymentResourceProps) {
+    super(scope, id, {
+      description: props.description,
+      restApiId: props.restApi.restApiId,
+    });
 
-    this.originalLogicalId = Stack.of(this).logicalIds.getLogicalId(this);
+    this.api = props.restApi;
+    this.originalLogicalId = Stack.of(this).getLogicalId(this);
   }
 
   /**
@@ -121,19 +155,22 @@ class LatestDeploymentResource extends CfnDeployment {
    * add via `addToLogicalId`.
    */
   protected prepare() {
+    if (this.api instanceof RestApi || this.api instanceof SpecRestApi) { // Ignore IRestApi that are imported
+
+      // Add CfnRestApi to the logical id so a new deployment is triggered when any of its properties change.
+      const cfnRestApiCF = (this.api.node.defaultChild as any)._toCloudFormation();
+      this.addToLogicalId(Stack.of(this).resolve(cfnRestApiCF));
+    }
+
     const stack = Stack.of(this);
 
     // if hash components were added to the deployment, we use them to calculate
     // a logical ID for the deployment resource.
     if (this.hashComponents.length > 0) {
       const md5 = crypto.createHash('md5');
-      this.hashComponents
-        .map(c => stack.resolve(c))
-        .forEach(c => md5.update(JSON.stringify(c)));
-
-      this.overrideLogicalId(this.originalLogicalId + md5.digest("hex"));
+      this.hashComponents.map(x => stack.resolve(x)).forEach(c => md5.update(JSON.stringify(c)));
+      this.overrideLogicalId(this.originalLogicalId + md5.digest('hex'));
     }
-
     super.prepare();
   }
 }

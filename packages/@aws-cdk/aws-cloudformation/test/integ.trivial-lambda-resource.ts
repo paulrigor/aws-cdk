@@ -1,6 +1,6 @@
-import lambda = require('@aws-cdk/aws-lambda');
-import cdk = require('@aws-cdk/cdk');
-import fs = require('fs');
+import * as lambda from '@aws-cdk/aws-lambda';
+import * as cdk from '@aws-cdk/core';
+import * as fs from 'fs';
 import { CustomResource, CustomResourceProvider } from '../lib';
 
 interface DemoResourceProps {
@@ -22,15 +22,15 @@ class DemoResource extends cdk.Construct {
     super(scope, id);
 
     const resource = new CustomResource(this, 'Resource', {
-      provider: CustomResourceProvider.lambda(new lambda.SingletonFunction(this, 'Singleton', {
+      provider: CustomResourceProvider.fromLambda(new lambda.SingletonFunction(this, 'Singleton', {
         uuid: 'f7d4f730-4ee1-11e8-9c2d-fa7ae01bbebc',
         // This makes the demo only work as top-level TypeScript program, but that's fine for now
         code: new lambda.InlineCode(fs.readFileSync('integ.trivial-lambda-provider.py', { encoding: 'utf-8' })),
         handler: 'index.main',
-        timeout: 300,
-        runtime: lambda.Runtime.Python27,
+        timeout: cdk.Duration.minutes(5),
+        runtime: lambda.Runtime.PYTHON_2_7,
       })),
-      properties: props
+      properties: props,
     });
 
     this.response = resource.getAtt('Response').toString();
@@ -51,7 +51,7 @@ class SucceedingStack extends cdk.Stack {
     // Publish the custom resource output
     new cdk.CfnOutput(this, 'ResponseMessage', {
       description: 'The message that came back from the Custom Resource',
-      value: resource.response
+      value: resource.response,
     });
   }
 }

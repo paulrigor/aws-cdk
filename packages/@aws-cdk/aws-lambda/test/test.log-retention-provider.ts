@@ -1,9 +1,11 @@
-import AWSSDK = require('aws-sdk');
-import AWS = require('aws-sdk-mock');
-import nock = require('nock');
+import * as AWSSDK from 'aws-sdk';
+import * as AWS from 'aws-sdk-mock';
+import * as nock from 'nock';
 import { Test } from 'nodeunit';
-import sinon = require('sinon');
-import provider = require('../lib/log-retention-provider');
+import * as sinon from 'sinon';
+import * as provider from '../lib/log-retention-provider';
+
+AWS.setSDK(require.resolve('aws-sdk'));
 
 const eventCommon = {
   ServiceToken: 'token',
@@ -16,7 +18,7 @@ const eventCommon = {
 };
 
 const context = {
-  functionName: 'provider'
+  functionName: 'provider',
 } as AWSLambda.Context;
 
 function createRequest(type: string) {
@@ -45,10 +47,10 @@ export = {
       ...eventCommon,
       RequestType: 'Create',
       ResourceProperties: {
-          ServiceToken: 'token',
-          RetentionInDays: '30',
-          LogGroupName: 'group'
-      }
+        ServiceToken: 'token',
+        RetentionInDays: '30',
+        LogGroupName: 'group',
+      },
     };
 
     const request = createRequest('SUCCESS');
@@ -56,21 +58,21 @@ export = {
     await provider.handler(event as AWSLambda.CloudFormationCustomResourceCreateEvent, context);
 
     sinon.assert.calledWith(createLogGroupFake, {
-      logGroupName: 'group'
+      logGroupName: 'group',
     });
 
     sinon.assert.calledWith(putRetentionPolicyFake, {
       logGroupName: 'group',
-      retentionInDays: 30
+      retentionInDays: 30,
     });
 
     sinon.assert.calledWith(createLogGroupFake, {
-      logGroupName: '/aws/lambda/provider'
+      logGroupName: '/aws/lambda/provider',
     });
 
     sinon.assert.calledWith(putRetentionPolicyFake, {
       logGroupName: '/aws/lambda/provider',
-      retentionInDays: 1
+      retentionInDays: 1,
     });
 
     sinon.assert.notCalled(deleteRetentionPolicyFake);
@@ -96,15 +98,15 @@ export = {
       ...eventCommon,
       RequestType: 'Update',
       ResourceProperties: {
-          ServiceToken: 'token',
-          RetentionInDays: '365',
-          LogGroupName: 'group'
+        ServiceToken: 'token',
+        RetentionInDays: '365',
+        LogGroupName: 'group',
       },
       OldResourceProperties: {
         ServiceToken: 'token',
         LogGroupName: 'group',
-        RetentionInDays: '30'
-      }
+        RetentionInDays: '30',
+      },
     };
 
     const request = createRequest('SUCCESS');
@@ -112,12 +114,12 @@ export = {
     await provider.handler(event as AWSLambda.CloudFormationCustomResourceUpdateEvent, context);
 
     sinon.assert.calledWith(createLogGroupFake, {
-      logGroupName: 'group'
+      logGroupName: 'group',
     });
 
     sinon.assert.calledWith(putRetentionPolicyFake, {
       logGroupName: 'group',
-      retentionInDays: 365
+      retentionInDays: 365,
     });
 
     sinon.assert.notCalled(deleteRetentionPolicyFake);
@@ -144,14 +146,14 @@ export = {
       RequestType: 'Update',
       PhysicalResourceId: 'group',
       ResourceProperties: {
-          ServiceToken: 'token',
-          LogGroupName: 'group'
+        ServiceToken: 'token',
+        LogGroupName: 'group',
       },
       OldResourceProperties: {
         ServiceToken: 'token',
         LogGroupName: 'group',
-        RetentionInDays: '365'
-      }
+        RetentionInDays: '365',
+      },
     };
 
     const request = createRequest('SUCCESS');
@@ -159,11 +161,11 @@ export = {
     await provider.handler(event as AWSLambda.CloudFormationCustomResourceUpdateEvent, context);
 
     sinon.assert.calledWith(createLogGroupFake, {
-      logGroupName: 'group'
+      logGroupName: 'group',
     });
 
     sinon.assert.calledWith(deleteRetentionPolicyFake, {
-      logGroupName: 'group'
+      logGroupName: 'group',
     });
 
     test.equal(request.isDone(), true);
@@ -185,9 +187,9 @@ export = {
       RequestType: 'Delete',
       PhysicalResourceId: 'group',
       ResourceProperties: {
-          ServiceToken: 'token',
-          LogGroupName: 'group'
-      }
+        ServiceToken: 'token',
+        LogGroupName: 'group',
+      },
     };
 
     const request = createRequest('SUCCESS');
@@ -214,10 +216,10 @@ export = {
       ...eventCommon,
       RequestType: 'Create',
       ResourceProperties: {
-          ServiceToken: 'token',
-          RetentionInDays: '30',
-          LogGroupName: 'group'
-      }
+        ServiceToken: 'token',
+        RetentionInDays: '30',
+        LogGroupName: 'group',
+      },
     };
 
     const request = createRequest('FAILED');
@@ -248,10 +250,10 @@ export = {
       ...eventCommon,
       RequestType: 'Create',
       ResourceProperties: {
-          ServiceToken: 'token',
-          RetentionInDays: '30',
-          LogGroupName: 'group'
-      }
+        ServiceToken: 'token',
+        RetentionInDays: '30',
+        LogGroupName: 'group',
+      },
     };
 
     const request = createRequest('SUCCESS');
@@ -261,5 +263,74 @@ export = {
     test.equal(request.isDone(), true);
 
     test.done();
-  }
+  },
+
+  async 'response data contains the log group name'(test: Test) {
+    AWS.mock('CloudWatchLogs', 'createLogGroup', sinon.fake.resolves({}));
+    AWS.mock('CloudWatchLogs', 'putRetentionPolicy', sinon.fake.resolves({}));
+    AWS.mock('CloudWatchLogs', 'deleteRetentionPolicy', sinon.fake.resolves({}));
+
+    const event = {
+      ...eventCommon,
+      ResourceProperties: {
+        ServiceToken: 'token',
+        RetentionInDays: '30',
+        LogGroupName: 'group',
+      },
+    };
+
+    async function withOperation(operation: string) {
+      const request = nock('https://localhost')
+        .put('/', (body: AWSLambda.CloudFormationCustomResourceResponse) => body.Data?.LogGroupName === 'group')
+        .reply(200);
+
+      const opEvent = { ...event, RequestType: operation };
+      await provider.handler(opEvent as AWSLambda.CloudFormationCustomResourceCreateEvent, context);
+
+      test.equal(request.isDone(), true);
+    }
+
+    await withOperation('Create');
+    await withOperation('Update');
+    await withOperation('Delete');
+
+    test.done();
+  },
+
+  async 'custom log retention retry options'(test: Test) {
+    AWS.mock('CloudWatchLogs', 'createLogGroup', sinon.fake.resolves({}));
+    AWS.mock('CloudWatchLogs', 'putRetentionPolicy', sinon.fake.resolves({}));
+    AWS.mock('CloudWatchLogs', 'deleteRetentionPolicy', sinon.fake.resolves({}));
+
+    const event = {
+      ...eventCommon,
+      RequestType: 'Create',
+      ResourceProperties: {
+        ServiceToken: 'token',
+        RetentionInDays: '30',
+        LogGroupName: 'group',
+        SdkRetry: {
+          maxRetries: '5',
+          base: '300',
+        },
+      },
+    };
+
+    const request = createRequest('SUCCESS');
+
+    await provider.handler(event as AWSLambda.CloudFormationCustomResourceCreateEvent, context);
+
+    sinon.assert.calledWith(AWSSDK.CloudWatchLogs as any, {
+      apiVersion: '2014-03-28',
+      maxRetries: 5,
+      retryOptions: {
+        base: 300,
+      },
+    });
+
+    test.equal(request.isDone(), true);
+
+    test.done();
+  },
+
 };

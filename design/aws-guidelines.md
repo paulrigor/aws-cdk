@@ -24,7 +24,7 @@ etc, `IFoo` would be `IBucket`, `ITopic` and so forth.
 The guidelines in this document use TypeScript (and npm package names) since
 this is the source programming language used to author the library, which is
 later packaged and published to all programming languages through
-[jsii](https://github.com/awslabs/jsii).
+[jsii](https://github.com/aws/jsii).
 
 ## Modules
 
@@ -320,7 +320,7 @@ export interface IFoo extends cdk.IConstruct, ISomething {
 
   // attributes
   readonly fooArn: string;
-  readonly fooBoo: string;
+  readonly fooBoo: string[];
 
   // security group connections (if applicable)
   readonly connections: ec2.Connections;
@@ -437,7 +437,7 @@ class ImportedFoo extends FooBase {
 - [ ] Metrics (`metricXxx`)
 - [ ] Events (`onXxx`)
 - [ ] Security Groups (`connections`)
-- [ ] Pipeline Actions (`addToPipline`)
+- [ ] Pipeline Actions (`addToPipeline`)
 - [ ] SNS Targets
 - [ ] `_asFooTarget`
 - [ ] TODO: other cross AWS patterns

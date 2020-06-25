@@ -1,13 +1,10 @@
 ## Amazon CloudWatch Logs Construct Library
 <!--BEGIN STABILITY BANNER-->
-
 ---
 
-![Stability: Experimental](https://img.shields.io/badge/stability-Experimental-important.svg?style=for-the-badge)
+![cfn-resources: Stable](https://img.shields.io/badge/cfn--resources-stable-success.svg?style=for-the-badge)
 
-> This API is still under active development and subject to non-backward
-> compatible changes or removal in any future version. Use of the API is not recommended in production
-> environments. Experimental APIs are not subject to the Semantic Versioning model.
+![cdk-constructs: Stable](https://img.shields.io/badge/cdk--constructs-stable-success.svg?style=for-the-badge)
 
 ---
 <!--END STABILITY BANNER-->
@@ -30,7 +27,8 @@ configures after how much time the events in the log stream expire and are
 deleted.
 
 The default retention period if not supplied is 2 years, but it can be set to
-any amount of days, or `Infinity` to keep the data in the log group forever.
+one of the values in the `RetentionDays` enum to configure a different
+retention period (including infinite retention).
 
 [retention example](test/example.retention.lit.ts)
 
@@ -53,7 +51,7 @@ const logGroup = new LogGroup(this, 'LogGroup', { ... });
 
 new SubscriptionFilter(this, 'Subscription', {
     logGroup,
-    destination: fn,
+    destination: new LogsDestinations.LambdaDestination(fn),
     filterPattern: FilterPattern.allTerms("ERROR", "MainThread")
 });
 ```
@@ -85,6 +83,31 @@ logGroup.extractMetric('$.jsonField', 'Namespace', 'MetricName');
 Will extract the value of `jsonField` wherever it occurs in JSON-structed
 log records in the LogGroup, and emit them to CloudWatch Metrics under
 the name `Namespace/MetricName`.
+
+#### Exposing Metric on a Metric Filter
+
+You can expose a metric on a metric filter by calling the `MetricFilter.metric()` API. 
+This has a default of `statistic = 'avg'` if the statistic is not set in the `props`.
+
+```ts
+const mf = new MetricFilter(this, 'MetricFilter', {
+  logGroup,
+  metricNamespace: 'MyApp',
+  metricName: 'Latency',
+  filterPattern: FilterPattern.exists('$.latency'),
+  metricValue: '$.latency',
+});
+
+//expose a metric from the metric filter
+const metric = mf.metric();
+
+//you can use the metric to create a new alarm
+new Alarm(this, 'alarm from metric filter', {
+  metric,
+  threshold: 100,
+  evaluationPeriods: 2,
+});
+```
 
 ### Patterns
 
@@ -218,3 +241,9 @@ const pattern = FilterPattern.spaceDelimited('time', 'component', '...', 'result
     .whereString('component', '=', 'HttpServer')
     .whereNumber('result_code', '!=', 200);
 ```
+
+### Notes
+
+Be aware that Log Group ARNs will always have the string `:*` appended to
+them, to match the behavior of [the CloudFormation `AWS::Logs::LogGroup`
+resource](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html#aws-resource-logs-loggroup-return-values).

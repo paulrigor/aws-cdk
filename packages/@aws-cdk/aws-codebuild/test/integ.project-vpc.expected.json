@@ -26,16 +26,16 @@
         "MapPublicIpOnLaunch": true,
         "Tags": [
           {
-            "Key": "Name",
-            "Value": "aws-cdk-codebuild-project-vpc/MyVPC/PublicSubnet1"
-          },
-          {
             "Key": "aws-cdk:subnet-name",
             "Value": "Public"
           },
           {
             "Key": "aws-cdk:subnet-type",
             "Value": "Public"
+          },
+          {
+            "Key": "Name",
+            "Value": "aws-cdk-codebuild-project-vpc/MyVPC/PublicSubnet1"
           }
         ]
       }
@@ -83,7 +83,13 @@
     "MyVPCPublicSubnet1EIP5EB6147D": {
       "Type": "AWS::EC2::EIP",
       "Properties": {
-        "Domain": "vpc"
+        "Domain": "vpc",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "aws-cdk-codebuild-project-vpc/MyVPC/PublicSubnet1"
+          }
+        ]
       }
     },
     "MyVPCPublicSubnet1NATGateway838228A5": {
@@ -117,16 +123,16 @@
         "MapPublicIpOnLaunch": false,
         "Tags": [
           {
-            "Key": "Name",
-            "Value": "aws-cdk-codebuild-project-vpc/MyVPC/PrivateSubnet1"
-          },
-          {
             "Key": "aws-cdk:subnet-name",
             "Value": "Private"
           },
           {
             "Key": "aws-cdk:subnet-type",
             "Value": "Private"
+          },
+          {
+            "Key": "Name",
+            "Value": "aws-cdk-codebuild-project-vpc/MyVPC/PrivateSubnet1"
           }
         ]
       }
@@ -202,7 +208,6 @@
             "IpProtocol": "-1"
           }
         ],
-        "SecurityGroupIngress": [],
         "VpcId": {
           "Ref": "MyVPCAFB07A31"
         }
@@ -217,17 +222,7 @@
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": {
-                "Service": {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "codebuild.",
-                      {
-                        "Ref": "AWS::URLSuffix"
-                      }
-                    ]
-                  ]
-                }
+                "Service": "codebuild.amazonaws.com"
               }
             }
           ],
@@ -240,61 +235,6 @@
       "Properties": {
         "PolicyDocument": {
           "Statement": [
-            {
-              "Action": [
-                "s3:GetObject*",
-                "s3:GetBucket*",
-                "s3:List*"
-              ],
-              "Effect": "Allow",
-              "Resource": [
-                {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "arn:",
-                      {
-                        "Ref": "AWS::Partition"
-                      },
-                      ":s3:::",
-                      {
-                        "Ref": "BundleS3Bucket0EFC11B0"
-                      }
-                    ]
-                  ]
-                },
-                {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "arn:",
-                      {
-                        "Ref": "AWS::Partition"
-                      },
-                      ":s3:::",
-                      {
-                        "Ref": "BundleS3Bucket0EFC11B0"
-                      },
-                      "/",
-                      {
-                        "Fn::Select": [
-                          0,
-                          {
-                            "Fn::Split": [
-                              "||",
-                              {
-                                "Ref": "BundleS3VersionKey720F2199"
-                              }
-                            ]
-                          }
-                        ]
-                      },
-                      "*"
-                    ]
-                  ]
-                }
-              ]
-            },
             {
               "Action": "ec2:CreateNetworkInterfacePermission",
               "Condition": {
@@ -409,6 +349,51 @@
         ]
       }
     },
+    "MyProject39F7B0AE": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "Artifacts": {
+          "Type": "NO_ARTIFACTS"
+        },
+        "Environment": {
+          "ComputeType": "BUILD_GENERAL1_SMALL",
+          "Image": "aws/codebuild/standard:1.0",
+          "PrivilegedMode": false,
+          "Type": "LINUX_CONTAINER"
+        },
+        "ServiceRole": {
+          "Fn::GetAtt": [
+            "MyProjectRole9BBE5233",
+            "Arn"
+          ]
+        },
+        "Source": {
+          "BuildSpec": "{\n  \"version\": \"0.2\",\n  \"phases\": {\n    \"build\": {\n      \"commands\": [\n        \"echo \\\"Nothing to do!\\\"\"\n      ]\n    }\n  }\n}",
+          "Type": "NO_SOURCE"
+        },
+        "VpcConfig": {
+          "SecurityGroupIds": [
+            {
+              "Fn::GetAtt": [
+                "SecurityGroup1F554B36F",
+                "GroupId"
+              ]
+            }
+          ],
+          "Subnets": [
+            {
+              "Ref": "MyVPCPrivateSubnet1Subnet641543F4"
+            }
+          ],
+          "VpcId": {
+            "Ref": "MyVPCAFB07A31"
+          }
+        }
+      },
+      "DependsOn": [
+        "MyProjectPolicyDocument646EE0F2"
+      ]
+    },
     "MyProjectPolicyDocument646EE0F2": {
       "Type": "AWS::IAM::Policy",
       "Properties": {
@@ -430,115 +415,13 @@
           ],
           "Version": "2012-10-17"
         },
-        "PolicyName": "CodeBuildEC2Policy",
+        "PolicyName": "MyProjectPolicyDocument646EE0F2",
         "Roles": [
           {
             "Ref": "MyProjectRole9BBE5233"
           }
         ]
       }
-    },
-    "MyProject39F7B0AE": {
-      "Type": "AWS::CodeBuild::Project",
-      "Properties": {
-        "Artifacts": {
-          "Type": "NO_ARTIFACTS"
-        },
-        "Environment": {
-          "ComputeType": "BUILD_GENERAL1_SMALL",
-          "EnvironmentVariables": [
-            {
-              "Name": "SCRIPT_S3_BUCKET",
-              "Type": "PLAINTEXT",
-              "Value": {
-                "Ref": "BundleS3Bucket0EFC11B0"
-              }
-            },
-            {
-              "Name": "SCRIPT_S3_KEY",
-              "Type": "PLAINTEXT",
-              "Value": {
-                "Fn::Join": [
-                  "",
-                  [
-                    {
-                      "Fn::Select": [
-                        0,
-                        {
-                          "Fn::Split": [
-                            "||",
-                            {
-                              "Ref": "BundleS3VersionKey720F2199"
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    {
-                      "Fn::Select": [
-                        1,
-                        {
-                          "Fn::Split": [
-                            "||",
-                            {
-                              "Ref": "BundleS3VersionKey720F2199"
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  ]
-                ]
-              }
-            }
-          ],
-          "Image": "aws/codebuild/standard:1.0",
-          "PrivilegedMode": false,
-          "Type": "LINUX_CONTAINER"
-        },
-        "ServiceRole": {
-          "Fn::GetAtt": [
-            "MyProjectRole9BBE5233",
-            "Arn"
-          ]
-        },
-        "Source": {
-          "BuildSpec": "{\n  \"version\": \"0.2\",\n  \"phases\": {\n    \"pre_build\": {\n      \"commands\": [\n        \"echo \\\"Downloading scripts from s3://${SCRIPT_S3_BUCKET}/${SCRIPT_S3_KEY}\\\"\",\n        \"aws s3 cp s3://${SCRIPT_S3_BUCKET}/${SCRIPT_S3_KEY} /tmp\",\n        \"mkdir -p /tmp/scriptdir\",\n        \"unzip /tmp/$(basename $SCRIPT_S3_KEY) -d /tmp/scriptdir\"\n      ]\n    },\n    \"build\": {\n      \"commands\": [\n        \"export SCRIPT_DIR=/tmp/scriptdir\",\n        \"echo \\\"Running build.sh\\\"\",\n        \"chmod +x /tmp/scriptdir/build.sh\",\n        \"/tmp/scriptdir/build.sh\"\n      ]\n    }\n  }\n}",
-          "Type": "NO_SOURCE"
-        },
-        "VpcConfig": {
-          "SecurityGroupIds": [
-            {
-              "Fn::GetAtt": [
-                "SecurityGroup1F554B36F",
-                "GroupId"
-              ]
-            }
-          ],
-          "Subnets": [
-            {
-              "Ref": "MyVPCPrivateSubnet1Subnet641543F4"
-            }
-          ],
-          "VpcId": {
-            "Ref": "MyVPCAFB07A31"
-          }
-        }
-      }
-    }
-  },
-  "Parameters": {
-    "BundleS3Bucket0EFC11B0": {
-      "Type": "String",
-      "Description": "S3 bucket for asset \"aws-cdk-codebuild-project-vpc/Bundle\""
-    },
-    "BundleS3VersionKey720F2199": {
-      "Type": "String",
-      "Description": "S3 key for asset version \"aws-cdk-codebuild-project-vpc/Bundle\""
-    },
-    "BundleArtifactHashEA214C27": {
-      "Type": "String",
-      "Description": "Artifact hash for asset \"aws-cdk-codebuild-project-vpc/Bundle\""
     }
   }
 }

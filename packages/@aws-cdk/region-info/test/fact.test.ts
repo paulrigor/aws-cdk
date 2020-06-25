@@ -7,7 +7,17 @@ describe('find', () => {
   });
 
   test('returns undefined for an unknown region', () => {
-    expect(Fact.find('bermuda-triangle-42', FactName.partition)).toBe(undefined);
+    expect(Fact.find('bermuda-triangle-42', FactName.PARTITION)).toBe(undefined);
+  });
+});
+
+describe('requireFact', () => {
+  test('throws error for an unknown fact', () => {
+    expect(() => Fact.requireFact(AWS_REGIONS[0], 'not:a:known:fact')).toThrowError();
+  });
+
+  test('throws error for an unknown region', () => {
+    expect(() => Fact.requireFact('bermuda-triangle-42', FactName.PARTITION)).toThrowError();
   });
 });
 
@@ -50,7 +60,7 @@ describe('register', () => {
   test('disallows re-registering a fact with a different value', () => {
     // GIVEN
     const region = AWS_REGIONS[0];
-    const name = FactName.partition;
+    const name = FactName.PARTITION;
     const value = '1337';
 
     // WHEN

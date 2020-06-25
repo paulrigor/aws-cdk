@@ -1,8 +1,25 @@
-import { Construct, Resource, Stack } from '@aws-cdk/cdk';
+import { Construct, Duration, IResource, Resource, Stack } from '@aws-cdk/core';
+import { AccessLogFormat, IAccessLogDestination} from './access-log';
 import { CfnStage } from './apigateway.generated';
 import { Deployment } from './deployment';
 import { IRestApi } from './restapi';
 import { parseMethodOptionsPath } from './util';
+
+/**
+ * Represents an APIGateway Stage.
+ */
+export interface IStage extends IResource {
+  /**
+   * Name of this stage.
+   * @attribute
+   */
+  readonly stageName: string;
+
+  /**
+   * RestApi to which this stage is associated.
+   */
+  readonly restApi: IRestApi;
+}
 
 export interface StageOptions extends MethodDeploymentOptions {
   /**
@@ -12,6 +29,22 @@ export interface StageOptions extends MethodDeploymentOptions {
    * @default - "prod"
    */
   readonly stageName?: string;
+
+  /**
+   * The CloudWatch Logs log group.
+   *
+   * @default - No destination
+   */
+  readonly accessLogDestination?: IAccessLogDestination;
+
+  /**
+   * A single line format of access logs of data, as specified by selected $content variables.
+   * The format must include at least `AccessLogFormat.contextRequestId()`.
+   * @see https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-mapping-template-reference.html#context-variable-reference
+   *
+   * @default - Common Log Format
+   */
+  readonly accessLogFormat?: AccessLogFormat;
 
   /**
    * Specifies whether Amazon X-Ray tracing is enabled for this method.
@@ -85,9 +118,9 @@ export interface StageProps extends StageOptions {
 }
 
 export enum MethodLoggingLevel {
-  Off = 'OFF',
-  Error = 'ERROR',
-  Info = 'INFO'
+  OFF = 'OFF',
+  ERROR = 'ERROR',
+  INFO = 'INFO'
 }
 
 export interface MethodDeploymentOptions {
@@ -145,9 +178,9 @@ export interface MethodDeploymentOptions {
    * higher the TTL, the longer the response will be cached.
    * @see https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-caching.html
    *
-   * @default 300
+   * @default Duration.minutes(5)
    */
-  readonly cacheTtlSeconds?: number;
+  readonly cacheTtl?: Duration;
 
   /**
    * Indicates whether the cached responses are encrypted.
@@ -157,10 +190,7 @@ export interface MethodDeploymentOptions {
   readonly cacheDataEncrypted?: boolean;
 }
 
-export class Stage extends Resource {
-  /**
-   * @attribute
-   */
+export class Stage extends Resource implements IStage {
   public readonly stageName: string;
 
   public readonly restApi: IRestApi;
@@ -172,6 +202,26 @@ export class Stage extends Resource {
     this.enableCacheCluster = props.cacheClusterEnabled;
 
     const methodSettings = this.renderMethodSettings(props); // this can mutate `this.cacheClusterEnabled`
+
+    // custom access logging
+    let accessLogSetting: CfnStage.AccessLogSettingProperty | undefined;
+    const accessLogDestination = props.accessLogDestination;
+    const accessLogFormat = props.accessLogFormat;
+    if (!accessLogDestination && !accessLogFormat) {
+      accessLogSetting = undefined;
+    } else {
+      if (accessLogFormat !== undefined && !/.*\$context.requestId.*/.test(accessLogFormat.toString())) {
+        throw new Error('Access log must include at least `AccessLogFormat.contextRequestId()`');
+      }
+      if (accessLogFormat !== undefined && accessLogDestination === undefined) {
+        throw new Error('Access log format is specified without a destination');
+      }
+
+      accessLogSetting = {
+        destinationArn: accessLogDestination?.bind(this).destinationArn,
+        format: accessLogFormat?.toString() ? accessLogFormat?.toString() : AccessLogFormat.clf().toString(),
+      };
+    }
 
     // enable cache cluster if cacheClusterSize is set
     if (props.cacheClusterSize !== undefined) {
@@ -185,6 +235,7 @@ export class Stage extends Resource {
     const cacheClusterSize = this.enableCacheCluster ? (props.cacheClusterSize || '0.5') : undefined;
     const resource = new CfnStage(this, 'Resource', {
       stageName: props.stageName || 'prod',
+      accessLogSetting,
       cacheClusterEnabled: this.enableCacheCluster,
       cacheClusterSize,
       clientCertificateId: props.clientCertificateId,
@@ -224,8 +275,8 @@ export class Stage extends Resource {
       throttlingBurstLimit: props.throttlingBurstLimit,
       throttlingRateLimit: props.throttlingRateLimit,
       cachingEnabled: props.cachingEnabled,
-      cacheTtlSeconds: props.cacheTtlSeconds,
-      cacheDataEncrypted: props.cacheDataEncrypted
+      cacheTtl: props.cacheTtl,
+      cacheDataEncrypted: props.cacheDataEncrypted,
     };
 
     // if any of them are defined, add an entry for '/*/*'.
@@ -256,7 +307,7 @@ export class Stage extends Resource {
       return {
         httpMethod, resourcePath,
         cacheDataEncrypted: options.cacheDataEncrypted,
-        cacheTtlInSeconds: options.cacheTtlSeconds,
+        cacheTtlInSeconds: options.cacheTtl && options.cacheTtl.toSeconds(),
         cachingEnabled: options.cachingEnabled,
         dataTraceEnabled: options.dataTraceEnabled,
         loggingLevel: options.loggingLevel,

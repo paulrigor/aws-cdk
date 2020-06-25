@@ -1,6 +1,6 @@
-import cdk = require('@aws-cdk/cdk');
-import path = require('path');
-import lambda = require('../lib');
+import * as cdk from '@aws-cdk/core';
+import * as path from 'path';
+import * as lambda from '../lib';
 
 class TestStack extends cdk.Stack {
   constructor(scope: cdk.App, id: string) {
@@ -8,9 +8,9 @@ class TestStack extends cdk.Stack {
 
     /// !show
     new lambda.Function(this, 'MyLambda', {
-      code: lambda.Code.file(path.join(__dirname, 'handler.zip')),
+      code: lambda.Code.fromAsset(path.join(__dirname, 'handler.zip')),
       handler: 'index.main',
-      runtime: lambda.Runtime.Python36
+      runtime: lambda.Runtime.PYTHON_3_6,
     });
     /// !hide
   }

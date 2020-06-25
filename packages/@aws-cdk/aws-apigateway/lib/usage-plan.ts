@@ -1,5 +1,4 @@
-import { Token } from '@aws-cdk/cdk';
-import { Construct, Resource } from '@aws-cdk/cdk';
+import { Construct, Lazy, Resource, Token } from '@aws-cdk/core';
 import { IApiKey } from './api-key';
 import { CfnUsagePlan, CfnUsagePlanKey } from './apigateway.generated';
 import { Method } from './method';
@@ -29,9 +28,9 @@ export interface ThrottleSettings {
  * Time period for which quota settings apply.
  */
 export enum Period {
-  Day = 'DAY',
-  Week = 'WEEK',
-  Month = 'MONTH'
+  DAY = 'DAY',
+  WEEK = 'WEEK',
+  MONTH = 'MONTH'
 }
 
 /**
@@ -66,20 +65,20 @@ export interface ThrottlingPerMethod {
    * The method for which you specify the throttling settings.
    * @default none
    */
-  readonly method: Method,
+  readonly method: Method;
 
   /**
    * Specifies the overall request rate (average requests per second) and burst capacity.
    * @default none
    */
-  readonly throttle: ThrottleSettings
+  readonly throttle: ThrottleSettings;
 }
 
 /**
- * Type of Usage Plan Key. Currently the only supported type is 'API_KEY'
+ * Type of Usage Plan Key. Currently the only supported type is 'ApiKey'
  */
-export enum UsagePlanKeyType {
-  ApiKey = 'API_KEY'
+const enum UsagePlanKeyType {
+  API_KEY = 'API_KEY'
 }
 
 /**
@@ -90,57 +89,57 @@ export interface UsagePlanPerApiStage {
   /**
    * @default none
    */
-  readonly api?: IRestApi,
+  readonly api?: IRestApi;
 
   /**
    *
    * [disable-awslint:ref-via-interface]
    * @default none
    */
-  readonly stage?: Stage,
+  readonly stage?: Stage;
 
   /**
    * @default none
    */
-  readonly throttle?: ThrottlingPerMethod[]
+  readonly throttle?: ThrottlingPerMethod[];
 }
 
 export interface UsagePlanProps {
   /**
-   * API Stages to be associated which the usage plan.
+   * API Stages to be associated with the usage plan.
    * @default none
    */
-  readonly apiStages?: UsagePlanPerApiStage[],
+  readonly apiStages?: UsagePlanPerApiStage[];
 
   /**
    * Represents usage plan purpose.
    * @default none
    */
-  readonly description?: string,
+  readonly description?: string;
 
   /**
    * Number of requests clients can make in a given time period.
    * @default none
    */
-  readonly quota?: QuotaSettings
+  readonly quota?: QuotaSettings;
 
   /**
    * Overall throttle settings for the API.
    * @default none
    */
-  readonly throttle?: ThrottleSettings,
+  readonly throttle?: ThrottleSettings;
 
   /**
    * Name for this usage plan.
    * @default none
    */
-  readonly name?: string
+  readonly name?: string;
 
   /**
    * ApiKey to be associated with the usage plan.
    * @default none
    */
-  readonly apiKey?: IApiKey
+  readonly apiKey?: IApiKey;
 }
 
 export class UsagePlan extends Resource {
@@ -156,7 +155,7 @@ export class UsagePlan extends Resource {
     let resource: CfnUsagePlan;
 
     resource = new CfnUsagePlan(this, 'Resource', {
-      apiStages: new Token(() => this.renderApiStages(this.apiStages)),
+      apiStages: Lazy.anyValue({ produce: () => this.renderApiStages(this.apiStages) }),
       description: props.description,
       quota: this.renderQuota(props),
       throttle: this.renderThrottle(props.throttle),
@@ -179,10 +178,15 @@ export class UsagePlan extends Resource {
    * @param apiKey
    */
   public addApiKey(apiKey: IApiKey): void {
-    new CfnUsagePlanKey(this, 'UsagePlanKeyResource', {
+    const prefix = 'UsagePlanKeyResource';
+
+    // Postfixing apikey id only from the 2nd child, to keep physicalIds of UsagePlanKey for existing CDK apps unmodifed.
+    const id = this.node.tryFindChild(prefix) ? `${prefix}:${apiKey.node.uniqueId}` : prefix;
+
+    new CfnUsagePlanKey(this, id, {
       keyId: apiKey.keyId,
-      keyType: UsagePlanKeyType.ApiKey,
-      usagePlanId: this.usagePlanId
+      keyType: UsagePlanKeyType.API_KEY,
+      usagePlanId: this.usagePlanId,
     });
   }
 
@@ -216,7 +220,7 @@ export class UsagePlan extends Resource {
     return {
       apiId,
       stage,
-      throttle
+      throttle,
     };
   }
 
@@ -229,7 +233,7 @@ export class UsagePlan extends Resource {
       const ret = {
         limit: limit ? limit : undefined,
         offset: props.quota ? props.quota.offset : undefined,
-        period: props.quota ? props.quota.period : undefined
+        period: props.quota ? props.quota.period : undefined,
       };
       return ret;
     }
@@ -245,7 +249,7 @@ export class UsagePlan extends Resource {
 
       ret = {
         burstLimit: burstLimit ? burstLimit : undefined,
-        rateLimit: rateLimit ? rateLimit : undefined
+        rateLimit: rateLimit ? rateLimit : undefined,
       };
     }
     return ret!;

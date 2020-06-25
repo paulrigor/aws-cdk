@@ -1,6 +1,6 @@
 {
   "name": "@aws-cdk/region-info",
-  "version": "0.33.0",
+  "version": "0.0.0",
   "description": "AWS region information, such as service principal names",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -18,7 +18,8 @@
         "namespace": "Amazon.CDK.RegionInfo",
         "packageId": "Amazon.CDK.RegionInfo",
         "signAssembly": true,
-        "assemblyOriginatorKeyFile": "../../key.snk"
+        "assemblyOriginatorKeyFile": "../../key.snk",
+        "iconUrl": "https://raw.githubusercontent.com/aws/aws-cdk/master/logo/default-256-dark.png"
       },
       "python": {
         "distName": "aws-cdk.region-info",
@@ -29,7 +30,8 @@
   "cdk-build": {
     "pre": [
       "npm run gen"
-    ]
+    ],
+    "jest": true
   },
   "scripts": {
     "gen": "bash build-tools/generate.sh",
@@ -38,9 +40,11 @@
     "lint": "cdk-lint",
     "test": "cdk-test",
     "pkglint": "pkglint -f",
+    "awslint": "cdk-awslint",
     "package": "cdk-package",
     "build+test+package": "npm run build+test && npm run package",
-    "build+test": "npm run build && npm test"
+    "build+test": "npm run build && npm test",
+    "compat": "cdk-compat"
   },
   "author": {
     "name": "Amazon Web Services",
@@ -49,31 +53,13 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@types/fs-extra": "^7.0.0",
-    "cdk-build-tools": "^0.33.0",
-    "fs-extra": "^8.0.1",
-    "pkglint": "^0.33.0"
-  },
-  "jest": {
-    "coverageReporters": [
-      "lcov",
-      "text-summary",
-      "html"
-    ],
-    "coverageThreshold": {
-      "global": {
-        "statements": 80,
-        "branches": 80
-      }
-    },
-    "preset": "ts-jest",
-    "testMatch": [
-      "**/__tests__/**/*.ts?(x)",
-      "**/?(*.)+(spec|test).ts?(x)"
-    ]
+    "@types/fs-extra": "^8.1.0",
+    "cdk-build-tools": "0.0.0",
+    "fs-extra": "^9.0.1",
+    "pkglint": "0.0.0"
   },
   "repository": {
-    "url": "https://github.com/awslabs/aws-cdk.git",
+    "url": "https://github.com/aws/aws-cdk.git",
     "type": "git",
     "directory": "packages/@aws-cdk/region-info"
   },
@@ -81,9 +67,20 @@
     "aws",
     "cdk"
   ],
-  "homepage": "https://github.com/awslabs/aws-cdk",
+  "homepage": "https://github.com/aws/aws-cdk",
   "engines": {
-    "node": ">= 8.10.0"
+    "node": ">= 10.13.0 <13 || >=13.7.0"
   },
-  "stability": "experimental"
+  "stability": "experimental",
+  "maturity": "experimental",
+  "awslint": {
+    "exclude": [
+      "docs-public-apis:@aws-cdk/region-info.Fact.regions",
+      "docs-public-apis:@aws-cdk/region-info.RegionInfo.regions",
+      "docs-public-apis:@aws-cdk/region-info.RegionInfo.name"
+    ]
+  },
+  "awscdkio": {
+    "announce": false
+  }
 }

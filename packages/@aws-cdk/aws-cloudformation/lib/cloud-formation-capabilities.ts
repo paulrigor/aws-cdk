@@ -1,5 +1,6 @@
 /**
  * Capabilities that affect whether CloudFormation is allowed to change IAM resources
+ * @deprecated use `core.CfnCapabilities`
  */
 export enum CloudFormationCapabilities {
   /**
@@ -8,7 +9,7 @@ export enum CloudFormationCapabilities {
    * Pass this capability if you wish to block the creation IAM resources.
    * @link https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-iam-template.html#using-iam-capabilities
    */
-  None = '',
+  NONE = '',
 
   /**
    * Capability to create anonymous IAM resources
@@ -16,7 +17,7 @@ export enum CloudFormationCapabilities {
    * Pass this capability if you're only creating anonymous resources.
    * @link https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-iam-template.html#using-iam-capabilities
    */
-  AnonymousIAM = 'CAPABILITY_IAM',
+  ANONYMOUS_IAM = 'CAPABILITY_IAM',
 
   /**
    * Capability to create named IAM resources.
@@ -27,5 +28,14 @@ export enum CloudFormationCapabilities {
    * `CloudFormationCapabilities.NamedIAM` implies `CloudFormationCapabilities.IAM`; you don't have to pass both.
    * @link https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-iam-template.html#using-iam-capabilities
    */
-  NamedIAM = 'CAPABILITY_NAMED_IAM',
+  NAMED_IAM = 'CAPABILITY_NAMED_IAM',
+
+  /**
+   * Capability to run CloudFormation macros
+   *
+   * Pass this capability if your template includes macros, for example AWS::Include or AWS::Serverless.
+   *
+   * @link https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_CreateStack.html
+   */
+  AUTO_EXPAND = 'CAPABILITY_AUTO_EXPAND'
 }

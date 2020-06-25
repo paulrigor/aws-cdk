@@ -1,19 +1,44 @@
-import { Stack } from '@aws-cdk/cdk';
+import { Stack } from '@aws-cdk/core';
 import { Test } from 'nodeunit';
-import { AlarmWidget, GraphWidget, Metric, Shading, SingleValueWidget } from '../lib';
+import { Alarm, AlarmWidget, Color, GraphWidget, LegendPosition, LogQueryWidget, Metric, Shading, SingleValueWidget } from '../lib';
 
 export = {
+  'add stacked property to graphs'(test: Test) {
+    // WHEN
+    const stack = new Stack();
+    const widget = new GraphWidget({
+      title: 'Test widget',
+      stacked: true,
+    });
+
+    // THEN
+    test.deepEqual(stack.resolve(widget.toJson()), [{
+      type: 'metric',
+      width: 6,
+      height: 6,
+      properties: {
+        view: 'timeSeries',
+        title: 'Test widget',
+        region: { Ref: 'AWS::Region' },
+        stacked: true,
+        yAxis: {},
+      },
+    }]);
+
+    test.done();
+  },
+
   'add metrics to graphs on either axis'(test: Test) {
     // WHEN
     const stack = new Stack();
     const widget = new GraphWidget({
       title: 'My fancy graph',
       left: [
-        new Metric({ namespace: 'CDK', metricName: 'Test' })
+        new Metric({ namespace: 'CDK', metricName: 'Test' }),
       ],
       right: [
-        new Metric({ namespace: 'CDK', metricName: 'Tast' })
-      ]
+        new Metric({ namespace: 'CDK', metricName: 'Tast' }),
+      ],
     });
 
     // THEN
@@ -26,12 +51,11 @@ export = {
         title: 'My fancy graph',
         region: { Ref: 'AWS::Region' },
         metrics: [
-          ['CDK', 'Test', { yAxis: 'left', period: 300, stat: 'Average' }],
-          ['CDK', 'Tast', { yAxis: 'right', period: 300, stat: 'Average' }]
+          ['CDK', 'Test'],
+          ['CDK', 'Tast', { yAxis: 'right' }],
         ],
-        annotations: { horizontal: [] },
-        yAxis: {}
-      }
+        yAxis: {},
+      },
     }]);
 
     test.done();
@@ -53,11 +77,10 @@ export = {
         view: 'timeSeries',
         region: { Ref: 'AWS::Region' },
         metrics: [
-          ['CDK', 'Test', { yAxis: 'left', period: 300, stat: 'Average', label: 'MyMetric', color: '000000' }],
+          ['CDK', 'Test', { label: 'MyMetric', color: '000000' }],
         ],
-        annotations: { horizontal: [] },
-        yAxis: {}
-      }
+        yAxis: {},
+      },
     }]);
 
     test.done();
@@ -70,7 +93,7 @@ export = {
 
     // WHEN
     const widget = new SingleValueWidget({
-      metrics: [ metric ]
+      metrics: [ metric ],
     });
 
     // THEN
@@ -82,9 +105,38 @@ export = {
         view: 'singleValue',
         region: { Ref: 'AWS::Region' },
         metrics: [
-          ['CDK', 'Test', { yAxis: 'left', period: 300, stat: 'Average' }],
-        ]
-      }
+          ['CDK', 'Test'],
+        ],
+      },
+    }]);
+
+    test.done();
+  },
+
+  'query result widget'(test: Test) {
+    // GIVEN
+    const stack = new Stack();
+    const logGroup = {logGroupName: 'my-log-group'};
+
+    // WHEN
+    const widget = new LogQueryWidget({
+      logGroupNames: [logGroup.logGroupName],
+      queryLines: [
+        'fields @message',
+        'filter @message like /Error/',
+      ],
+    });
+
+    // THEN
+    test.deepEqual(stack.resolve(widget.toJson()), [{
+      type: 'log',
+      width: 6,
+      height: 6,
+      properties: {
+        view: 'table',
+        region: { Ref: 'AWS::Region' },
+        query: `SOURCE '${logGroup.logGroupName}' | fields @message\n| filter @message like /Error/`,
+      },
     }]);
 
     test.done();
@@ -94,9 +146,9 @@ export = {
     // GIVEN
     const stack = new Stack();
 
-    const alarm = new Metric({ namespace: 'CDK', metricName: 'Test' }).newAlarm(stack, 'Alarm', {
+    const alarm = new Metric({ namespace: 'CDK', metricName: 'Test' }).createAlarm(stack, 'Alarm', {
       evaluationPeriods: 2,
-      threshold: 1000
+      threshold: 1000,
     });
 
     // WHEN
@@ -113,10 +165,10 @@ export = {
         view: 'timeSeries',
         region: { Ref: 'AWS::Region' },
         annotations: {
-          alarms: [{ 'Fn::GetAtt': [ 'Alarm7103F465', 'Arn' ] }]
+          alarms: [{ 'Fn::GetAtt': [ 'Alarm7103F465', 'Arn' ] }],
         },
-        yAxis: {}
-      }
+        yAxis: {},
+      },
     }]);
 
     test.done();
@@ -128,14 +180,14 @@ export = {
     const widget = new GraphWidget({
       title: 'My fancy graph',
       left: [
-        new Metric({ namespace: 'CDK', metricName: 'Test' })
+        new Metric({ namespace: 'CDK', metricName: 'Test' }),
       ],
       leftAnnotations: [{
         value: 1000,
         color: '667788',
-        fill: Shading.Below,
+        fill: Shading.BELOW,
         label: 'this is the annotation',
-      }]
+      }],
     });
 
     // THEN
@@ -148,7 +200,7 @@ export = {
         title: 'My fancy graph',
         region: { Ref: 'AWS::Region' },
         metrics: [
-          ['CDK', 'Test', { yAxis: 'left', period: 300, stat: 'Average' }],
+          ['CDK', 'Test'],
         ],
         annotations: { horizontal: [{
           yAxis: 'left',
@@ -157,8 +209,8 @@ export = {
           fill: 'below',
           label: 'this is the annotation',
         }] },
-        yAxis: {}
-      }
+        yAxis: {},
+      },
     }]);
 
     test.done();
@@ -170,15 +222,16 @@ export = {
 
     const metric = new Metric({ namespace: 'CDK', metricName: 'Test' });
 
-    const alarm = metric.newAlarm(stack, 'Alarm', {
-      evaluationPeriods: 2,
-      threshold: 1000
+    const alarm = metric.createAlarm(stack, 'Alarm', {
+      evaluationPeriods: 7,
+      datapointsToAlarm: 2,
+      threshold: 1000,
     });
 
     // WHEN
     const widget = new GraphWidget({
       right: [ metric ],
-      rightAnnotations: [ alarm.toAnnotation() ]
+      rightAnnotations: [ alarm.toAnnotation() ],
     });
 
     // THEN
@@ -190,17 +243,17 @@ export = {
         view: 'timeSeries',
         region: { Ref: 'AWS::Region' },
         metrics: [
-          ['CDK', 'Test', { yAxis: 'right', period: 300, stat: 'Average' }],
+          ['CDK', 'Test', { yAxis: 'right' }],
         ],
         annotations: {
           horizontal: [{
             yAxis: 'right',
             value: 1000,
-            label: 'Test >= 1000 for 2 datapoints within 10 minutes',
-          }]
+            label: 'Test >= 1000 for 2 datapoints within 35 minutes',
+          }],
         },
-        yAxis: {}
-      }
+        yAxis: {},
+      },
     }]);
 
     test.done();
@@ -212,20 +265,20 @@ export = {
     const widget = new GraphWidget({
       title: 'My fancy graph',
       left: [
-        new Metric({ namespace: 'CDK', metricName: 'Test' })
+        new Metric({ namespace: 'CDK', metricName: 'Test' }),
       ],
       right: [
-        new Metric({ namespace: 'CDK', metricName: 'Tast' })
+        new Metric({ namespace: 'CDK', metricName: 'Tast' }),
       ],
       leftYAxis: ({
-        label: "Left yAxis",
-        max: 100
+        label: 'Left yAxis',
+        max: 100,
       }),
       rightYAxis: ({
-        label: "Right yAxis",
+        label: 'Right yAxis',
         min: 10,
-        showUnits: false
-      })
+        showUnits: false,
+      }),
     });
 
     // THEN
@@ -238,14 +291,164 @@ export = {
         title: 'My fancy graph',
         region: { Ref: 'AWS::Region' },
         metrics: [
-          ['CDK', 'Test', { yAxis: 'left', period: 300, stat: 'Average' }],
-          ['CDK', 'Tast', { yAxis: 'right', period: 300, stat: 'Average' }]
+          ['CDK', 'Test'],
+          ['CDK', 'Tast', { yAxis: 'right' }],
         ],
-        annotations: { horizontal: [] },
         yAxis: {
-          left: { label: "Left yAxis", max: 100 },
-          right: { label: "Right yAxis", min: 10, showUnits: false } }
+          left: { label: 'Left yAxis', max: 100 },
+          right: { label: 'Right yAxis', min: 10, showUnits: false } },
+      },
+    }]);
+
+    test.done();
+  },
+
+  'specify liveData property on graph'(test: Test) {
+    // WHEN
+    const stack = new Stack();
+    const widget = new GraphWidget({
+      title: 'My live graph',
+      left: [
+        new Metric({ namespace: 'CDK', metricName: 'Test' }),
+      ],
+      liveData: true,
+    });
+
+    // THEN
+    test.deepEqual(stack.resolve(widget.toJson()), [{
+      type: 'metric',
+      width: 6,
+      height: 6,
+      properties: {
+        view: 'timeSeries',
+        title: 'My live graph',
+        region: { Ref: 'AWS::Region' },
+        metrics: [
+          ['CDK', 'Test'],
+        ],
+        liveData: true,
+        yAxis: {},
+      },
+    }]);
+
+    test.done();
+  },
+
+  'can use imported alarm with graph'(test: Test) {
+    // GIVEN
+    const stack = new Stack();
+    const alarm = Alarm.fromAlarmArn(stack, 'Alarm', 'arn:aws:cloudwatch:region:account-id:alarm:alarm-name');
+
+    // WHEN
+    new AlarmWidget({
+      title: 'My fancy graph',
+      alarm,
+    });
+
+    // THEN: Compiles
+
+    test.done();
+  },
+
+  'add setPeriodToTimeRange to singleValueWidget'(test: Test) {
+    // GIVEN
+    const stack = new Stack();
+    const metric = new Metric({ namespace: 'CDK', metricName: 'Test' });
+
+    // WHEN
+    const widget = new SingleValueWidget({
+      metrics: [ metric ],
+      setPeriodToTimeRange: true,
+    });
+
+    // THEN
+    test.deepEqual(stack.resolve(widget.toJson()), [{
+      type: 'metric',
+      width: 6,
+      height: 3,
+      properties: {
+        view: 'singleValue',
+        region: { Ref: 'AWS::Region' },
+        metrics: [
+          ['CDK', 'Test'],
+        ],
+        setPeriodToTimeRange: true,
+      },
+    }]);
+
+    test.done();
+  },
+
+  'allows overriding custom values of dashboard widgets'(test: Test) {
+    class HiddenMetric extends Metric {
+      public toMetricConfig() {
+        const ret = super.toMetricConfig();
+        // @ts-ignore
+        ret.renderingProperties.visible = false;
+        return ret;
       }
+    }
+
+    const stack = new Stack();
+    const widget = new GraphWidget({
+      left: [
+        new HiddenMetric({ namespace: 'CDK', metricName: 'Test' }),
+      ],
+    });
+
+    // test.ok(widget.toJson()[0].properties.metrics[0].visible === false);
+    test.deepEqual(
+      stack.resolve(widget.toJson())[0].properties.metrics[0],
+      ['CDK', 'Test', { visible: false }],
+    );
+
+    test.done();
+  },
+
+  'GraphColor is correctly converted into the correct hexcode'(test: Test) {
+    // GIVEN
+    const stack = new Stack();
+    const metric = new Metric({ namespace: 'CDK', metricName: 'Test' });
+
+    // WHEN
+    const widget = new GraphWidget({
+      left: [metric.with({
+        color: Color.BLUE,
+      })],
+      leftAnnotations: [
+        { color: Color.RED, value: 100 },
+      ],
+    });
+
+    test.deepEqual(stack.resolve(widget.toJson())[0].properties.metrics[0], [ 'CDK', 'Test', { color: '#1f77b4' } ]);
+    test.deepEqual(stack.resolve(widget.toJson())[0].properties.annotations.horizontal[0], { yAxis: 'left', value: 100, color: '#d62728' });
+    test.done();
+  },
+
+  'legend position is respected in constructor'(test: Test) {
+    // WHEN
+    const stack = new Stack();
+    const widget = new GraphWidget({
+      left: [new Metric({ namespace: 'CDK', metricName: 'Test' }) ],
+      legendPosition: LegendPosition.RIGHT,
+    });
+
+    // THEN
+    test.deepEqual(stack.resolve(widget.toJson()), [{
+      type: 'metric',
+      width: 6,
+      height: 6,
+      properties: {
+        view: 'timeSeries',
+        region: { Ref: 'AWS::Region' },
+        metrics: [
+          ['CDK', 'Test'],
+        ],
+        yAxis: {},
+        legend: {
+          position: 'right',
+        },
+      },
     }]);
 
     test.done();

@@ -1,7 +1,7 @@
-import events = require('@aws-cdk/aws-events');
-import iam = require('@aws-cdk/aws-iam');
-import lambda = require('@aws-cdk/aws-lambda');
-import { Construct, IResource, Resource, Token } from '@aws-cdk/cdk';
+import * as events from '@aws-cdk/aws-events';
+import * as iam from '@aws-cdk/aws-iam';
+import * as lambda from '@aws-cdk/aws-lambda';
+import { Construct, IResource, Lazy, Resource } from '@aws-cdk/core';
 import { CfnConfigRule } from './config.generated';
 
 /**
@@ -19,33 +19,68 @@ export interface IRule extends IResource {
    * Defines a CloudWatch event rule which triggers for rule events. Use
    * `rule.addEventPattern(pattern)` to specify a filter.
    */
-  onEvent(id: string, options: events.OnEventOptions): events.Rule;
+  onEvent(id: string, options?: events.OnEventOptions): events.Rule;
 
   /**
    * Defines a CloudWatch event rule which triggers for rule compliance events.
    */
-  onComplianceChange(id: string, options: events.OnEventOptions): events.Rule;
+  onComplianceChange(id: string, options?: events.OnEventOptions): events.Rule;
 
   /**
    * Defines a CloudWatch event rule which triggers for rule re-evaluation status events.
    */
-  onReEvaluationStatus(id: string, options: events.OnEventOptions): events.Rule;
-}
-
-/**
- * Reference to an existing rule.
- */
-export interface RuleAttributes {
-  /**
-   * The rule name.
-   */
-  readonly configRuleName: string;
+  onReEvaluationStatus(id: string, options?: events.OnEventOptions): events.Rule;
 }
 
 /**
  * A new or imported rule.
  */
 abstract class RuleBase extends Resource implements IRule {
+  public abstract readonly configRuleName: string;
+
+  /**
+   * Defines a CloudWatch event rule which triggers for rule events. Use
+   * `rule.addEventPattern(pattern)` to specify a filter.
+   */
+  public onEvent(id: string, options: events.OnEventOptions = {}) {
+    const rule = new events.Rule(this, id, options);
+    rule.addEventPattern({
+      source: ['aws.config'],
+      detail: {
+        configRuleName: [this.configRuleName],
+      },
+    });
+    rule.addTarget(options.target);
+    return rule;
+  }
+
+  /**
+   * Defines a CloudWatch event rule which triggers for rule compliance events.
+   */
+  public onComplianceChange(id: string, options: events.OnEventOptions = {}): events.Rule {
+    const rule = this.onEvent(id, options);
+    rule.addEventPattern({
+      detailType: [ 'Config Rules Compliance Change' ],
+    });
+    return rule;
+  }
+
+  /**
+   * Defines a CloudWatch event rule which triggers for rule re-evaluation status events.
+   */
+  public onReEvaluationStatus(id: string, options: events.OnEventOptions = {}): events.Rule {
+    const rule = this.onEvent(id, options);
+    rule.addEventPattern({
+      detailType: [ 'Config Rules Re-evaluation Status' ],
+    });
+    return rule;
+  }
+}
+
+/**
+ * A new managed or custom rule.
+ */
+abstract class RuleNew extends RuleBase {
   /**
    * Imports an existing rule.
    *
@@ -59,51 +94,6 @@ abstract class RuleBase extends Resource implements IRule {
     return new Import(scope, id);
   }
 
-  public abstract readonly configRuleName: string;
-
-  /**
-   * Defines a CloudWatch event rule which triggers for rule events. Use
-   * `rule.addEventPattern(pattern)` to specify a filter.
-   */
-  public onEvent(id: string, options: events.OnEventOptions) {
-    const rule = new events.Rule(this, id, options);
-    rule.addEventPattern({
-      source: ['aws.config'],
-      detail: {
-        configRuleName: [this.configRuleName]
-      }
-    });
-    rule.addTarget(options.target);
-    return rule;
-  }
-
-  /**
-   * Defines a CloudWatch event rule which triggers for rule compliance events.
-   */
-  public onComplianceChange(id: string, options: events.OnEventOptions): events.Rule {
-    const rule = this.onEvent(id, options);
-    rule.addEventPattern({
-      detailType: [ 'Config Rules Compliance Change' ],
-    });
-    return rule;
-  }
-
-  /**
-   * Defines a CloudWatch event rule which triggers for rule re-evaluation status events.
-   */
-  public onReEvaluationStatus(id: string, options: events.OnEventOptions): events.Rule {
-    const rule = this.onEvent(id, options);
-    rule.addEventPattern({
-      detailType: [ 'Config Rules Re-evaluation Status' ],
-    });
-    return rule;
-  }
-}
-
-/**
- * A new managed or custom rule.
- */
-abstract class RuleNew extends RuleBase {
   /**
    * The arn of the rule.
    */
@@ -147,7 +137,7 @@ abstract class RuleNew extends RuleBase {
    */
   public scopeToResources(...types: string[]) {
     this.scopeTo({
-      complianceResourceTypes: types
+      complianceResourceTypes: types,
     });
   }
 
@@ -160,7 +150,7 @@ abstract class RuleNew extends RuleBase {
   public scopeToTag(key: string, value?: string) {
     this.scopeTo({
       tagKey: key,
-      tagValue: value
+      tagValue: value,
     });
   }
 
@@ -177,10 +167,30 @@ abstract class RuleNew extends RuleBase {
  * The maximum frequency at which the AWS Config rule runs evaluations.
  */
 export enum MaximumExecutionFrequency {
+
+  /**
+   * 1 hour.
+   */
   ONE_HOUR = 'One_Hour',
+
+  /**
+   * 3 hours.
+   */
   THREE_HOURS = 'Three_Hours',
+
+  /**
+   * 6 hours.
+   */
   SIX_HOURS = 'Six_Hours',
+
+  /**
+   * 12 hours.
+   */
   TWELVE_HOURS = 'Twelve_Hours',
+
+  /**
+   * 24 hours.
+   */
   TWENTY_FOUR_HOURS = 'TwentyFour_Hours'
 }
 
@@ -193,7 +203,7 @@ export interface RuleProps {
    *
    * @default a CloudFormation generated name
    */
-  readonly name?: string;
+  readonly configRuleName?: string;
 
   /**
    * A description about this AWS Config rule.
@@ -248,24 +258,26 @@ export class ManagedRule extends RuleNew {
   public readonly configRuleComplianceType: string;
 
   constructor(scope: Construct, id: string, props: ManagedRuleProps) {
-    super(scope, id);
+    super(scope, id, {
+      physicalName: props.configRuleName,
+    });
 
     const rule = new CfnConfigRule(this, 'Resource', {
-      configRuleName: props.name,
+      configRuleName: this.physicalName,
       description: props.description,
       inputParameters: props.inputParameters,
       maximumExecutionFrequency: props.maximumExecutionFrequency,
-      scope: new Token(() => this.scope),
+      scope: Lazy.anyValue({ produce: () => this.scope }),
       source: {
         owner: 'AWS',
-        sourceIdentifier: props.identifier
-      }
+        sourceIdentifier: props.identifier,
+      },
     });
 
-    this.configRuleName = rule.configRuleName;
-    this.configRuleArn = rule.configRuleArn;
-    this.configRuleId = rule.configRuleId;
-    this.configRuleComplianceType = rule.configRuleComplianceType;
+    this.configRuleName = rule.ref;
+    this.configRuleArn = rule.attrArn;
+    this.configRuleId = rule.attrConfigRuleId;
+    this.configRuleComplianceType = rule.attrComplianceType;
 
     this.isManaged = true;
   }
@@ -313,7 +325,9 @@ export class CustomRule extends RuleNew {
   public readonly configRuleComplianceType: string;
 
   constructor(scope: Construct, id: string, props: CustomRuleProps) {
-    super(scope, id);
+    super(scope, id, {
+      physicalName: props.configRuleName,
+    });
 
     if (!props.configurationChanges && !props.periodic) {
       throw new Error('At least one of `configurationChanges` or `periodic` must be set to true.');
@@ -323,30 +337,30 @@ export class CustomRule extends RuleNew {
 
     if (props.configurationChanges) {
       sourceDetails.push({
-          eventSource: 'aws.config',
-          messageType: 'ConfigurationItemChangeNotification'
-        });
+        eventSource: 'aws.config',
+        messageType: 'ConfigurationItemChangeNotification',
+      });
       sourceDetails.push({
-          eventSource: 'aws.config',
-          messageType: 'OversizedConfigurationItemChangeNotification'
-        });
+        eventSource: 'aws.config',
+        messageType: 'OversizedConfigurationItemChangeNotification',
+      });
     }
 
     if (props.periodic) {
       sourceDetails.push({
         eventSource: 'aws.config',
         maximumExecutionFrequency: props.maximumExecutionFrequency,
-        messageType: 'ScheduledNotification'
+        messageType: 'ScheduledNotification',
       });
     }
 
     props.lambdaFunction.addPermission('Permission', {
-      principal: new iam.ServicePrincipal('config.amazonaws.com')
+      principal: new iam.ServicePrincipal('config.amazonaws.com'),
     });
 
     if (props.lambdaFunction.role) {
-      props.lambdaFunction.role.attachManagedPolicy(
-        new iam.AwsManagedPolicy('service-role/AWSConfigRulesExecutionRole', this).policyArn
+      props.lambdaFunction.role.addManagedPolicy(
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSConfigRulesExecutionRole'),
       );
     }
 
@@ -354,22 +368,22 @@ export class CustomRule extends RuleNew {
     this.node.addDependency(props.lambdaFunction);
 
     const rule = new CfnConfigRule(this, 'Resource', {
-      configRuleName: props.name,
+      configRuleName: this.physicalName,
       description: props.description,
       inputParameters: props.inputParameters,
       maximumExecutionFrequency: props.maximumExecutionFrequency,
-      scope: new Token(() => this.scope),
+      scope: Lazy.anyValue({ produce: () => this.scope }),
       source: {
         owner: 'CUSTOM_LAMBDA',
         sourceDetails,
-        sourceIdentifier: props.lambdaFunction.functionArn
-      }
+        sourceIdentifier: props.lambdaFunction.functionArn,
+      },
     });
 
-    this.configRuleName = rule.configRuleName;
-    this.configRuleArn = rule.configRuleArn;
-    this.configRuleId = rule.configRuleId;
-    this.configRuleComplianceType = rule.configRuleComplianceType;
+    this.configRuleName = rule.ref;
+    this.configRuleArn = rule.attrArn;
+    this.configRuleId = rule.attrConfigRuleId;
+    this.configRuleComplianceType = rule.attrComplianceType;
 
     if (props.configurationChanges) {
       this.isCustomWithChanges = true;

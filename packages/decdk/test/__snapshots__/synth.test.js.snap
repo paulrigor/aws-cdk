@@ -31,16 +31,16 @@ Object {
     },
   },
   "Parameters": Object {
-    "HelloLambdaCodeArtifactHashBB927E34": Object {
-      "Description": "Artifact hash for asset \\"apigw/HelloLambda/Code\\"",
+    "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cArtifactHash47CFB54E": Object {
+      "Description": "Artifact hash for asset \\"a6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30c\\"",
       "Type": "String",
     },
-    "HelloLambdaCodeS3BucketB83F7900": Object {
-      "Description": "S3 bucket for asset \\"apigw/HelloLambda/Code\\"",
+    "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3Bucket0D05C9AA": Object {
+      "Description": "S3 bucket for asset \\"a6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30c\\"",
       "Type": "String",
     },
-    "HelloLambdaCodeS3VersionKey2936C385": Object {
-      "Description": "S3 key for asset version \\"apigw/HelloLambda/Code\\"",
+    "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3VersionKeyDC0BC7B3": Object {
+      "Description": "S3 key for asset version \\"a6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30c\\"",
       "Type": "String",
     },
   },
@@ -88,61 +88,7 @@ Object {
       },
       "Type": "AWS::ApiGateway::Method",
     },
-    "HelloLambda3D9C82D6": Object {
-      "DependsOn": Array [
-        "HelloLambdaServiceRoleE071F162",
-      ],
-      "Properties": Object {
-        "Code": Object {
-          "S3Bucket": Object {
-            "Ref": "HelloLambdaCodeS3BucketB83F7900",
-          },
-          "S3Key": Object {
-            "Fn::Join": Array [
-              "",
-              Array [
-                Object {
-                  "Fn::Select": Array [
-                    0,
-                    Object {
-                      "Fn::Split": Array [
-                        "||",
-                        Object {
-                          "Ref": "HelloLambdaCodeS3VersionKey2936C385",
-                        },
-                      ],
-                    },
-                  ],
-                },
-                Object {
-                  "Fn::Select": Array [
-                    1,
-                    Object {
-                      "Fn::Split": Array [
-                        "||",
-                        Object {
-                          "Ref": "HelloLambdaCodeS3VersionKey2936C385",
-                        },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            ],
-          },
-        },
-        "Handler": "index.handler",
-        "Role": Object {
-          "Fn::GetAtt": Array [
-            "HelloLambdaServiceRoleE071F162",
-            "Arn",
-          ],
-        },
-        "Runtime": "python3.6",
-      },
-      "Type": "AWS::Lambda::Function",
-    },
-    "HelloLambdaApiPermissionANY8F73F0B3": Object {
+    "GetRootApiPermissionTestapigwMyApiCBFBC5B0GET5B244F0C": Object {
       "Properties": Object {
         "Action": "lambda:InvokeFunction",
         "FunctionName": Object {
@@ -172,59 +118,14 @@ Object {
               Object {
                 "Ref": "MyApi49610EDF",
               },
-              "/",
-              Object {
-                "Ref": "MyApiDeploymentStageprodE1054AF0",
-              },
-              "/*/",
+              "/test-invoke-stage/GET/",
             ],
           ],
         },
       },
       "Type": "AWS::Lambda::Permission",
     },
-    "HelloLambdaApiPermissionANYproxyDDCB8205": Object {
-      "Properties": Object {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": Object {
-          "Fn::GetAtt": Array [
-            "HelloLambda3D9C82D6",
-            "Arn",
-          ],
-        },
-        "Principal": "apigateway.amazonaws.com",
-        "SourceArn": Object {
-          "Fn::Join": Array [
-            "",
-            Array [
-              "arn:",
-              Object {
-                "Ref": "AWS::Partition",
-              },
-              ":execute-api:",
-              Object {
-                "Ref": "AWS::Region",
-              },
-              ":",
-              Object {
-                "Ref": "AWS::AccountId",
-              },
-              ":",
-              Object {
-                "Ref": "MyApi49610EDF",
-              },
-              "/",
-              Object {
-                "Ref": "MyApiDeploymentStageprodE1054AF0",
-              },
-              "/*/{proxy+}",
-            ],
-          ],
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
-    },
-    "HelloLambdaApiPermissionGET9C8E6AB1": Object {
+    "GetRootApiPermissionapigwMyApiCBFBC5B0GETC314E626": Object {
       "Properties": Object {
         "Action": "lambda:InvokeFunction",
         "FunctionName": Object {
@@ -265,7 +166,98 @@ Object {
       },
       "Type": "AWS::Lambda::Permission",
     },
-    "HelloLambdaApiPermissionTestANYAF78D25D": Object {
+    "HelloLambda3D9C82D6": Object {
+      "DependsOn": Array [
+        "HelloLambdaServiceRoleE071F162",
+      ],
+      "Properties": Object {
+        "Code": Object {
+          "S3Bucket": Object {
+            "Ref": "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3Bucket0D05C9AA",
+          },
+          "S3Key": Object {
+            "Fn::Join": Array [
+              "",
+              Array [
+                Object {
+                  "Fn::Select": Array [
+                    0,
+                    Object {
+                      "Fn::Split": Array [
+                        "||",
+                        Object {
+                          "Ref": "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3VersionKeyDC0BC7B3",
+                        },
+                      ],
+                    },
+                  ],
+                },
+                Object {
+                  "Fn::Select": Array [
+                    1,
+                    Object {
+                      "Fn::Split": Array [
+                        "||",
+                        Object {
+                          "Ref": "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3VersionKeyDC0BC7B3",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            ],
+          },
+        },
+        "Handler": "index.handler",
+        "Role": Object {
+          "Fn::GetAtt": Array [
+            "HelloLambdaServiceRoleE071F162",
+            "Arn",
+          ],
+        },
+        "Runtime": "python3.6",
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "HelloLambdaServiceRoleE071F162": Object {
+      "Properties": Object {
+        "AssumeRolePolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": Object {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": Array [
+          Object {
+            "Fn::Join": Array [
+              "",
+              Array [
+                "arn:",
+                Object {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "MyApi49610EDF": Object {
+      "Properties": Object {
+        "Name": "MyApi",
+      },
+      "Type": "AWS::ApiGateway::RestApi",
+    },
+    "MyApiANYApiPermissionTestapigwMyApiCBFBC5B0ANYAD86D377": Object {
       "Properties": Object {
         "Action": "lambda:InvokeFunction",
         "FunctionName": Object {
@@ -302,7 +294,7 @@ Object {
       },
       "Type": "AWS::Lambda::Permission",
     },
-    "HelloLambdaApiPermissionTestANYproxy6DC057A0": Object {
+    "MyApiANYApiPermissionapigwMyApiCBFBC5B0ANY5BBED348": Object {
       "Properties": Object {
         "Action": "lambda:InvokeFunction",
         "FunctionName": Object {
@@ -332,96 +324,16 @@ Object {
               Object {
                 "Ref": "MyApi49610EDF",
               },
-              "/test-invoke-stage/*/{proxy+}",
+              "/",
+              Object {
+                "Ref": "MyApiDeploymentStageprodE1054AF0",
+              },
+              "/*/",
             ],
           ],
         },
       },
       "Type": "AWS::Lambda::Permission",
-    },
-    "HelloLambdaApiPermissionTestGETD6487E03": Object {
-      "Properties": Object {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": Object {
-          "Fn::GetAtt": Array [
-            "HelloLambda3D9C82D6",
-            "Arn",
-          ],
-        },
-        "Principal": "apigateway.amazonaws.com",
-        "SourceArn": Object {
-          "Fn::Join": Array [
-            "",
-            Array [
-              "arn:",
-              Object {
-                "Ref": "AWS::Partition",
-              },
-              ":execute-api:",
-              Object {
-                "Ref": "AWS::Region",
-              },
-              ":",
-              Object {
-                "Ref": "AWS::AccountId",
-              },
-              ":",
-              Object {
-                "Ref": "MyApi49610EDF",
-              },
-              "/test-invoke-stage/GET/",
-            ],
-          ],
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
-    },
-    "HelloLambdaServiceRoleE071F162": Object {
-      "Properties": Object {
-        "AssumeRolePolicyDocument": Object {
-          "Statement": Array [
-            Object {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": Object {
-                "Service": Object {
-                  "Fn::Join": Array [
-                    "",
-                    Array [
-                      "lambda.",
-                      Object {
-                        "Ref": "AWS::URLSuffix",
-                      },
-                    ],
-                  ],
-                },
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "ManagedPolicyArns": Array [
-          Object {
-            "Fn::Join": Array [
-              "",
-              Array [
-                "arn:",
-                Object {
-                  "Ref": "AWS::Partition",
-                },
-                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-              ],
-            ],
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Role",
-    },
-    "MyApi49610EDF": Object {
-      "Properties": Object {
-        "Name": "MyApi",
-      },
-      "Type": "AWS::ApiGateway::RestApi",
     },
     "MyApiANYEC3618D9": Object {
       "Properties": Object {
@@ -488,17 +400,7 @@ Object {
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": Object {
-                "Service": Object {
-                  "Fn::Join": Array [
-                    "",
-                    Array [
-                      "apigateway.",
-                      Object {
-                        "Ref": "AWS::URLSuffix",
-                      },
-                    ],
-                  ],
-                },
+                "Service": "apigateway.amazonaws.com",
               },
             },
           ],
@@ -521,7 +423,7 @@ Object {
       },
       "Type": "AWS::IAM::Role",
     },
-    "MyApiDeploymentECB0D05Ed646248a19f9620d956e9fa33de3ed89": Object {
+    "MyApiDeploymentECB0D05E0597cc4592870e54c401cccc6090bd86": Object {
       "DependsOn": Array [
         "GetRootA9424890",
         "MyApiproxyANYFCF46C66",
@@ -539,7 +441,7 @@ Object {
     "MyApiDeploymentStageprodE1054AF0": Object {
       "Properties": Object {
         "DeploymentId": Object {
-          "Ref": "MyApiDeploymentECB0D05Ed646248a19f9620d956e9fa33de3ed89",
+          "Ref": "MyApiDeploymentECB0D05E0597cc4592870e54c401cccc6090bd86",
         },
         "RestApiId": Object {
           "Ref": "MyApi49610EDF",
@@ -547,6 +449,84 @@ Object {
         "StageName": "prod",
       },
       "Type": "AWS::ApiGateway::Stage",
+    },
+    "MyApiproxyANYApiPermissionTestapigwMyApiCBFBC5B0ANYproxy6DC68FBB": Object {
+      "Properties": Object {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": Object {
+          "Fn::GetAtt": Array [
+            "HelloLambda3D9C82D6",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": Object {
+          "Fn::Join": Array [
+            "",
+            Array [
+              "arn:",
+              Object {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              Object {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              Object {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              Object {
+                "Ref": "MyApi49610EDF",
+              },
+              "/test-invoke-stage/*/*",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "MyApiproxyANYApiPermissionapigwMyApiCBFBC5B0ANYproxyB3375D73": Object {
+      "Properties": Object {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": Object {
+          "Fn::GetAtt": Array [
+            "HelloLambda3D9C82D6",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": Object {
+          "Fn::Join": Array [
+            "",
+            Array [
+              "arn:",
+              Object {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              Object {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              Object {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              Object {
+                "Ref": "MyApi49610EDF",
+              },
+              "/",
+              Object {
+                "Ref": "MyApiDeploymentStageprodE1054AF0",
+              },
+              "/*/*",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
     },
     "MyApiproxyANYFCF46C66": Object {
       "Properties": Object {
@@ -619,13 +599,8 @@ Object {
           Object {
             "Essential": true,
             "Image": "redis",
-            "Links": Array [],
             "Memory": 1024,
-            "MountPoints": Array [],
             "Name": "ContainerDef",
-            "PortMappings": Array [],
-            "Ulimits": Array [],
-            "VolumesFrom": Array [],
           },
         ],
         "Cpu": "1024",
@@ -641,7 +616,6 @@ Object {
             "Arn",
           ],
         },
-        "Volumes": Array [],
       },
       "Type": "AWS::ECS::TaskDefinition",
     },
@@ -653,17 +627,7 @@ Object {
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": Object {
-                "Service": Object {
-                  "Fn::Join": Array [
-                    "",
-                    Array [
-                      "ecs-tasks.",
-                      Object {
-                        "Ref": "AWS::URLSuffix",
-                      },
-                    ],
-                  ],
-                },
+                "Service": "ecs-tasks.amazonaws.com",
               },
             },
           ],
@@ -682,8 +646,8 @@ Object {
           "MinimumHealthyPercent": 50,
         },
         "DesiredCount": 1,
+        "EnableECSManagedTags": false,
         "LaunchType": "FARGATE",
-        "LoadBalancers": Array [],
         "NetworkConfiguration": Object {
           "AwsvpcConfiguration": Object {
             "AssignPublicIp": "DISABLED",
@@ -702,7 +666,6 @@ Object {
             ],
           },
         },
-        "ServiceRegistries": Array [],
         "TaskDefinition": Object {
           "Ref": "MyTaskDef01F0D39B",
         },
@@ -719,7 +682,6 @@ Object {
             "IpProtocol": "-1",
           },
         ],
-        "SecurityGroupIngress": Array [],
         "VpcId": Object {
           "Ref": "VPCB9E5F0B4",
         },
@@ -791,14 +753,17 @@ Object {
     },
     "VPCPrivateSubnet1Subnet8BCA10E0": Object {
       "Properties": Object {
-        "AvailabilityZone": "dummy1a",
+        "AvailabilityZone": Object {
+          "Fn::Select": Array [
+            0,
+            Object {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
         "CidrBlock": "10.0.128.0/17",
         "MapPublicIpOnLaunch": false,
         "Tags": Array [
-          Object {
-            "Key": "Name",
-            "Value": "ecs/VPC/PrivateSubnet1",
-          },
           Object {
             "Key": "aws-cdk:subnet-name",
             "Value": "Private",
@@ -806,6 +771,10 @@ Object {
           Object {
             "Key": "aws-cdk:subnet-type",
             "Value": "Private",
+          },
+          Object {
+            "Key": "Name",
+            "Value": "ecs/VPC/PrivateSubnet1",
           },
         ],
         "VpcId": Object {
@@ -832,6 +801,12 @@ Object {
     "VPCPublicSubnet1EIP6AD938E8": Object {
       "Properties": Object {
         "Domain": "vpc",
+        "Tags": Array [
+          Object {
+            "Key": "Name",
+            "Value": "ecs/VPC/PublicSubnet1",
+          },
+        ],
       },
       "Type": "AWS::EC2::EIP",
     },
@@ -882,14 +857,17 @@ Object {
     },
     "VPCPublicSubnet1SubnetB4246D30": Object {
       "Properties": Object {
-        "AvailabilityZone": "dummy1a",
+        "AvailabilityZone": Object {
+          "Fn::Select": Array [
+            0,
+            Object {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
         "CidrBlock": "10.0.0.0/17",
         "MapPublicIpOnLaunch": true,
         "Tags": Array [
-          Object {
-            "Key": "Name",
-            "Value": "ecs/VPC/PublicSubnet1",
-          },
           Object {
             "Key": "aws-cdk:subnet-name",
             "Value": "Public",
@@ -897,6 +875,10 @@ Object {
           Object {
             "Key": "aws-cdk:subnet-type",
             "Value": "Public",
+          },
+          Object {
+            "Key": "Name",
+            "Value": "ecs/VPC/PublicSubnet1",
           },
         ],
         "VpcId": Object {
@@ -951,21 +933,21 @@ Object {
     },
   },
   "Parameters": Object {
-    "HelloWorldFunctionCodeArtifactHashEF4E01C5": Object {
-      "Description": "Artifact hash for asset \\"lambda-events/HelloWorldFunction/Code\\"",
+    "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cArtifactHash47CFB54E": Object {
+      "Description": "Artifact hash for asset \\"a6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30c\\"",
       "Type": "String",
     },
-    "HelloWorldFunctionCodeS3BucketF87BE172": Object {
-      "Description": "S3 bucket for asset \\"lambda-events/HelloWorldFunction/Code\\"",
+    "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3Bucket0D05C9AA": Object {
+      "Description": "S3 bucket for asset \\"a6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30c\\"",
       "Type": "String",
     },
-    "HelloWorldFunctionCodeS3VersionKeyF84D6469": Object {
-      "Description": "S3 key for asset version \\"lambda-events/HelloWorldFunction/Code\\"",
+    "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3VersionKeyDC0BC7B3": Object {
+      "Description": "S3 key for asset version \\"a6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30c\\"",
       "Type": "String",
     },
   },
   "Resources": Object {
-    "HelloWorldFunctionApiPermissionGEThello0F001828": Object {
+    "HelloWorldFunctionAllowInvokelambdaeventsMyTopic988FAB3E43035740": Object {
       "Properties": Object {
         "Action": "lambda:InvokeFunction",
         "FunctionName": Object {
@@ -974,149 +956,9 @@ Object {
             "Arn",
           ],
         },
-        "Principal": "apigateway.amazonaws.com",
+        "Principal": "sns.amazonaws.com",
         "SourceArn": Object {
-          "Fn::Join": Array [
-            "",
-            Array [
-              "arn:",
-              Object {
-                "Ref": "AWS::Partition",
-              },
-              ":execute-api:",
-              Object {
-                "Ref": "AWS::Region",
-              },
-              ":",
-              Object {
-                "Ref": "AWS::AccountId",
-              },
-              ":",
-              Object {
-                "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F12449C5F",
-              },
-              "/",
-              Object {
-                "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FDeploymentStageprod6A86C016",
-              },
-              "/GET/hello",
-            ],
-          ],
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
-    },
-    "HelloWorldFunctionApiPermissionPOSThelloD4001E4B": Object {
-      "Properties": Object {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": Object {
-          "Fn::GetAtt": Array [
-            "HelloWorldFunctionB2AB6E79",
-            "Arn",
-          ],
-        },
-        "Principal": "apigateway.amazonaws.com",
-        "SourceArn": Object {
-          "Fn::Join": Array [
-            "",
-            Array [
-              "arn:",
-              Object {
-                "Ref": "AWS::Partition",
-              },
-              ":execute-api:",
-              Object {
-                "Ref": "AWS::Region",
-              },
-              ":",
-              Object {
-                "Ref": "AWS::AccountId",
-              },
-              ":",
-              Object {
-                "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F12449C5F",
-              },
-              "/",
-              Object {
-                "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FDeploymentStageprod6A86C016",
-              },
-              "/POST/hello",
-            ],
-          ],
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
-    },
-    "HelloWorldFunctionApiPermissionTestGEThelloE66B9322": Object {
-      "Properties": Object {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": Object {
-          "Fn::GetAtt": Array [
-            "HelloWorldFunctionB2AB6E79",
-            "Arn",
-          ],
-        },
-        "Principal": "apigateway.amazonaws.com",
-        "SourceArn": Object {
-          "Fn::Join": Array [
-            "",
-            Array [
-              "arn:",
-              Object {
-                "Ref": "AWS::Partition",
-              },
-              ":execute-api:",
-              Object {
-                "Ref": "AWS::Region",
-              },
-              ":",
-              Object {
-                "Ref": "AWS::AccountId",
-              },
-              ":",
-              Object {
-                "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F12449C5F",
-              },
-              "/test-invoke-stage/GET/hello",
-            ],
-          ],
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
-    },
-    "HelloWorldFunctionApiPermissionTestPOSThello4AFE6FE3": Object {
-      "Properties": Object {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": Object {
-          "Fn::GetAtt": Array [
-            "HelloWorldFunctionB2AB6E79",
-            "Arn",
-          ],
-        },
-        "Principal": "apigateway.amazonaws.com",
-        "SourceArn": Object {
-          "Fn::Join": Array [
-            "",
-            Array [
-              "arn:",
-              Object {
-                "Ref": "AWS::Partition",
-              },
-              ":execute-api:",
-              Object {
-                "Ref": "AWS::Region",
-              },
-              ":",
-              Object {
-                "Ref": "AWS::AccountId",
-              },
-              ":",
-              Object {
-                "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F12449C5F",
-              },
-              "/test-invoke-stage/POST/hello",
-            ],
-          ],
+          "Ref": "MyTopic86869434",
         },
       },
       "Type": "AWS::Lambda::Permission",
@@ -1129,7 +971,7 @@ Object {
       "Properties": Object {
         "Code": Object {
           "S3Bucket": Object {
-            "Ref": "HelloWorldFunctionCodeS3BucketF87BE172",
+            "Ref": "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3Bucket0D05C9AA",
           },
           "S3Key": Object {
             "Fn::Join": Array [
@@ -1142,7 +984,7 @@ Object {
                       "Fn::Split": Array [
                         "||",
                         Object {
-                          "Ref": "HelloWorldFunctionCodeS3VersionKeyF84D6469",
+                          "Ref": "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3VersionKeyDC0BC7B3",
                         },
                       ],
                     },
@@ -1155,7 +997,7 @@ Object {
                       "Fn::Split": Array [
                         "||",
                         Object {
-                          "Ref": "HelloWorldFunctionCodeS3VersionKeyF84D6469",
+                          "Ref": "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3VersionKeyDC0BC7B3",
                         },
                       ],
                     },
@@ -1197,23 +1039,7 @@ Object {
       },
       "Type": "AWS::Lambda::EventSourceMapping",
     },
-    "HelloWorldFunctionMyTopic7834422D": Object {
-      "Properties": Object {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": Object {
-          "Fn::GetAtt": Array [
-            "HelloWorldFunctionB2AB6E79",
-            "Arn",
-          ],
-        },
-        "Principal": "sns.amazonaws.com",
-        "SourceArn": Object {
-          "Ref": "MyTopic86869434",
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
-    },
-    "HelloWorldFunctionMyTopicSubscription20D3FA87": Object {
+    "HelloWorldFunctionMyTopic90F6E0EF": Object {
       "Properties": Object {
         "Endpoint": Object {
           "Fn::GetAtt": Array [
@@ -1236,17 +1062,7 @@ Object {
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": Object {
-                "Service": Object {
-                  "Fn::Join": Array [
-                    "",
-                    Array [
-                      "lambda.",
-                      Object {
-                        "Ref": "AWS::URLSuffix",
-                      },
-                    ],
-                  ],
-                },
+                "Service": "lambda.amazonaws.com",
               },
             },
           ],
@@ -1274,6 +1090,24 @@ Object {
         "PolicyDocument": Object {
           "Statement": Array [
             Object {
+              "Action": "dynamodb:ListStreams",
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::Join": Array [
+                  "",
+                  Array [
+                    Object {
+                      "Fn::GetAtt": Array [
+                        "TableCD117FA1",
+                        "Arn",
+                      ],
+                    },
+                    "/stream/*",
+                  ],
+                ],
+              },
+            },
+            Object {
               "Action": Array [
                 "dynamodb:DescribeStream",
                 "dynamodb:GetRecords",
@@ -1286,11 +1120,6 @@ Object {
                   "StreamArn",
                 ],
               },
-            },
-            Object {
-              "Action": "dynamodb:ListStreams",
-              "Effect": "Allow",
-              "Resource": "*",
             },
           ],
           "Version": "2012-10-17",
@@ -1308,6 +1137,7 @@ Object {
       "Type": "AWS::SNS::Topic",
     },
     "TableCD117FA1": Object {
+      "DeletionPolicy": "Retain",
       "Properties": Object {
         "AttributeDefinitions": Array [
           Object {
@@ -1330,6 +1160,7 @@ Object {
         },
       },
       "Type": "AWS::DynamoDB::Table",
+      "UpdateReplacePolicy": "Retain",
     },
     "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F12449C5F": Object {
       "Properties": Object {
@@ -1359,17 +1190,7 @@ Object {
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": Object {
-                "Service": Object {
-                  "Fn::Join": Array [
-                    "",
-                    Array [
-                      "apigateway.",
-                      Object {
-                        "Ref": "AWS::URLSuffix",
-                      },
-                    ],
-                  ],
-                },
+                "Service": "apigateway.amazonaws.com",
               },
             },
           ],
@@ -1392,7 +1213,7 @@ Object {
       },
       "Type": "AWS::IAM::Role",
     },
-    "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FDeploymentFF3F4A1Aa119fa0e654d84489ef88606c21a73fb": Object {
+    "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FDeploymentFF3F4A1Ac00dde791d2719be3e8ea69f9a61a5cd": Object {
       "DependsOn": Array [
         "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FhelloGET04FBC7F6",
         "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FhelloPOST53F177B1",
@@ -1409,7 +1230,7 @@ Object {
     "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FDeploymentStageprod6A86C016": Object {
       "Properties": Object {
         "DeploymentId": Object {
-          "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FDeploymentFF3F4A1Aa119fa0e654d84489ef88606c21a73fb",
+          "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FDeploymentFF3F4A1Ac00dde791d2719be3e8ea69f9a61a5cd",
         },
         "RestApiId": Object {
           "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F12449C5F",
@@ -1473,6 +1294,84 @@ Object {
       },
       "Type": "AWS::ApiGateway::Method",
     },
+    "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FhelloGETApiPermissionTestlambdaeventslambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F0AAEF724GEThello5EA12CF5": Object {
+      "Properties": Object {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": Object {
+          "Fn::GetAtt": Array [
+            "HelloWorldFunctionB2AB6E79",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": Object {
+          "Fn::Join": Array [
+            "",
+            Array [
+              "arn:",
+              Object {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              Object {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              Object {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              Object {
+                "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F12449C5F",
+              },
+              "/test-invoke-stage/GET/hello",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FhelloGETApiPermissionlambdaeventslambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F0AAEF724GEThelloAC4AB5E4": Object {
+      "Properties": Object {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": Object {
+          "Fn::GetAtt": Array [
+            "HelloWorldFunctionB2AB6E79",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": Object {
+          "Fn::Join": Array [
+            "",
+            Array [
+              "arn:",
+              Object {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              Object {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              Object {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              Object {
+                "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F12449C5F",
+              },
+              "/",
+              Object {
+                "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FDeploymentStageprod6A86C016",
+              },
+              "/GET/hello",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
     "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FhelloPOST53F177B1": Object {
       "Properties": Object {
         "AuthorizationType": "NONE",
@@ -1513,6 +1412,84 @@ Object {
       },
       "Type": "AWS::ApiGateway::Method",
     },
+    "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FhelloPOSTApiPermissionTestlambdaeventslambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F0AAEF724POSThello991892DD": Object {
+      "Properties": Object {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": Object {
+          "Fn::GetAtt": Array [
+            "HelloWorldFunctionB2AB6E79",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": Object {
+          "Fn::Join": Array [
+            "",
+            Array [
+              "arn:",
+              Object {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              Object {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              Object {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              Object {
+                "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F12449C5F",
+              },
+              "/test-invoke-stage/POST/hello",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FhelloPOSTApiPermissionlambdaeventslambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F0AAEF724POSThello3501FACF": Object {
+      "Properties": Object {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": Object {
+          "Fn::GetAtt": Array [
+            "HelloWorldFunctionB2AB6E79",
+            "Arn",
+          ],
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": Object {
+          "Fn::Join": Array [
+            "",
+            Array [
+              "arn:",
+              Object {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              Object {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              Object {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              Object {
+                "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4F12449C5F",
+              },
+              "/",
+              Object {
+                "Ref": "lambdaeventsHelloWorldFunctionAB27BB65ApiEventSourceA7A86A4FDeploymentStageprod6A86C016",
+              },
+              "/POST/hello",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
   },
 }
 `;
@@ -1520,20 +1497,36 @@ Object {
 exports[`lambda-topic.json: lambda-topic 1`] = `
 Object {
   "Parameters": Object {
-    "LambdaCodeArtifactHash305E64BB": Object {
-      "Description": "Artifact hash for asset \\"lambda-topic/Lambda/Code\\"",
+    "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cArtifactHash47CFB54E": Object {
+      "Description": "Artifact hash for asset \\"a6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30c\\"",
       "Type": "String",
     },
-    "LambdaCodeS3Bucket65766E44": Object {
-      "Description": "S3 bucket for asset \\"lambda-topic/Lambda/Code\\"",
+    "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3Bucket0D05C9AA": Object {
+      "Description": "S3 bucket for asset \\"a6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30c\\"",
       "Type": "String",
     },
-    "LambdaCodeS3VersionKey10FC11BE": Object {
-      "Description": "S3 key for asset version \\"lambda-topic/Lambda/Code\\"",
+    "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3VersionKeyDC0BC7B3": Object {
+      "Description": "S3 key for asset version \\"a6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30c\\"",
       "Type": "String",
     },
   },
   "Resources": Object {
+    "LambdaAllowInvokelambdatopicTopic702108A3CE1309A3": Object {
+      "Properties": Object {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": Object {
+          "Fn::GetAtt": Array [
+            "LambdaD247545B",
+            "Arn",
+          ],
+        },
+        "Principal": "sns.amazonaws.com",
+        "SourceArn": Object {
+          "Ref": "TopicBFC7AF6E",
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
     "LambdaD247545B": Object {
       "DependsOn": Array [
         "LambdaServiceRoleA8ED4D3B",
@@ -1541,7 +1534,7 @@ Object {
       "Properties": Object {
         "Code": Object {
           "S3Bucket": Object {
-            "Ref": "LambdaCodeS3Bucket65766E44",
+            "Ref": "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3Bucket0D05C9AA",
           },
           "S3Key": Object {
             "Fn::Join": Array [
@@ -1554,7 +1547,7 @@ Object {
                       "Fn::Split": Array [
                         "||",
                         Object {
-                          "Ref": "LambdaCodeS3VersionKey10FC11BE",
+                          "Ref": "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3VersionKeyDC0BC7B3",
                         },
                       ],
                     },
@@ -1567,7 +1560,7 @@ Object {
                       "Fn::Split": Array [
                         "||",
                         Object {
-                          "Ref": "LambdaCodeS3VersionKey10FC11BE",
+                          "Ref": "AssetParametersa6017def6c75b1a9adc95dfc1b2d7bb3dc0dad8ef9e71da67cc1b7c3826fe30cS3VersionKeyDC0BC7B3",
                         },
                       ],
                     },
@@ -1596,17 +1589,7 @@ Object {
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": Object {
-                "Service": Object {
-                  "Fn::Join": Array [
-                    "",
-                    Array [
-                      "lambda.",
-                      Object {
-                        "Ref": "AWS::URLSuffix",
-                      },
-                    ],
-                  ],
-                },
+                "Service": "lambda.amazonaws.com",
               },
             },
           ],
@@ -1629,23 +1612,7 @@ Object {
       },
       "Type": "AWS::IAM::Role",
     },
-    "LambdaTopic59002359": Object {
-      "Properties": Object {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": Object {
-          "Fn::GetAtt": Array [
-            "LambdaD247545B",
-            "Arn",
-          ],
-        },
-        "Principal": "sns.amazonaws.com",
-        "SourceArn": Object {
-          "Ref": "TopicBFC7AF6E",
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
-    },
-    "LambdaTopicSubscriptionF6CC623D": Object {
+    "LambdaTopicCCB0C2A3": Object {
       "Properties": Object {
         "Endpoint": Object {
           "Fn::GetAtt": Array [
@@ -1707,17 +1674,7 @@ Object {
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": Object {
-                "Service": Object {
-                  "Fn::Join": Array [
-                    "",
-                    Array [
-                      "codebuild.",
-                      Object {
-                        "Ref": "AWS::URLSuffix",
-                      },
-                    ],
-                  ],
-                },
+                "Service": "codebuild.amazonaws.com",
               },
             },
           ],
@@ -1786,6 +1743,39 @@ Object {
                   ],
                 },
               ],
+            },
+            Object {
+              "Action": Array [
+                "codebuild:CreateReportGroup",
+                "codebuild:CreateReport",
+                "codebuild:UpdateReport",
+                "codebuild:BatchPutTestCases",
+              ],
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::Join": Array [
+                  "",
+                  Array [
+                    "arn:",
+                    Object {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":codebuild:",
+                    Object {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    Object {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":report-group/",
+                    Object {
+                      "Ref": "BuildProject097C5DB7",
+                    },
+                    "-*",
+                  ],
+                ],
+              },
             },
             Object {
               "Action": Array [
@@ -1882,6 +1872,9 @@ Object {
                 "kms:Delete*",
                 "kms:ScheduleKeyDeletion",
                 "kms:CancelKeyDeletion",
+                "kms:GenerateDataKey",
+                "kms:TagResource",
+                "kms:UntagResource",
               ],
               "Effect": "Allow",
               "Principal": Object {
@@ -1927,6 +1920,7 @@ Object {
         },
       },
       "Type": "AWS::KMS::Key",
+      "UpdateReplacePolicy": "Retain",
     },
     "PipelineArtifactsBucket22248F97": Object {
       "DeletionPolicy": "Retain",
@@ -1946,11 +1940,18 @@ Object {
             },
           ],
         },
+        "PublicAccessBlockConfiguration": Object {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true,
+        },
       },
       "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Retain",
     },
     "PipelineArtifactsBucketEncryptionKey01D58D69": Object {
-      "DeletionPolicy": "Retain",
+      "DeletionPolicy": "Delete",
       "Properties": Object {
         "KeyPolicy": Object {
           "Statement": Array [
@@ -1968,6 +1969,9 @@ Object {
                 "kms:Delete*",
                 "kms:ScheduleKeyDeletion",
                 "kms:CancelKeyDeletion",
+                "kms:GenerateDataKey",
+                "kms:TagResource",
+                "kms:UntagResource",
               ],
               "Effect": "Allow",
               "Principal": Object {
@@ -2021,7 +2025,58 @@ Object {
               "Principal": Object {
                 "AWS": Object {
                   "Fn::GetAtt": Array [
+                    "PipelineSourceCodePipelineActionRoleC6F9E7F5",
+                    "Arn",
+                  ],
+                },
+              },
+              "Resource": "*",
+            },
+            Object {
+              "Action": Array [
+                "kms:Decrypt",
+                "kms:DescribeKey",
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+              ],
+              "Effect": "Allow",
+              "Principal": Object {
+                "AWS": Object {
+                  "Fn::GetAtt": Array [
                     "BuildProjectRoleAA92C755",
+                    "Arn",
+                  ],
+                },
+              },
+              "Resource": "*",
+            },
+            Object {
+              "Action": Array [
+                "kms:Decrypt",
+                "kms:DescribeKey",
+              ],
+              "Effect": "Allow",
+              "Principal": Object {
+                "AWS": Object {
+                  "Fn::GetAtt": Array [
+                    "PipelineDeployRole97597E3E",
+                    "Arn",
+                  ],
+                },
+              },
+              "Resource": "*",
+            },
+            Object {
+              "Action": Array [
+                "kms:Decrypt",
+                "kms:DescribeKey",
+              ],
+              "Effect": "Allow",
+              "Principal": Object {
+                "AWS": Object {
+                  "Fn::GetAtt": Array [
+                    "PipelineDeployCodePipelineActionRole8B83082E",
                     "Arn",
                   ],
                 },
@@ -2033,6 +2088,83 @@ Object {
         },
       },
       "Type": "AWS::KMS::Key",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "PipelineArtifactsBucketEncryptionKeyAlias5C510EEE": Object {
+      "DeletionPolicy": "Delete",
+      "Properties": Object {
+        "AliasName": "alias/codepipeline-pipelinepipeline22f2a91d",
+        "TargetKeyId": Object {
+          "Fn::GetAtt": Array [
+            "PipelineArtifactsBucketEncryptionKey01D58D69",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::KMS::Alias",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "PipelineBuildCodePipelineActionRoleD77A08E6": Object {
+      "Properties": Object {
+        "AssumeRolePolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": Object {
+                "AWS": Object {
+                  "Fn::Join": Array [
+                    "",
+                    Array [
+                      "arn:",
+                      Object {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      Object {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":root",
+                    ],
+                  ],
+                },
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "PipelineBuildCodePipelineActionRoleDefaultPolicyC9CB73F8": Object {
+      "Properties": Object {
+        "PolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": Array [
+                "codebuild:BatchGetBuilds",
+                "codebuild:StartBuild",
+                "codebuild:StopBuild",
+              ],
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "BuildProject097C5DB7",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "PipelineBuildCodePipelineActionRoleDefaultPolicyC9CB73F8",
+        "Roles": Array [
+          Object {
+            "Ref": "PipelineBuildCodePipelineActionRoleD77A08E6",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
     },
     "PipelineC660917D": Object {
       "DependsOn": Array [
@@ -2081,13 +2213,18 @@ Object {
                     ],
                   },
                 },
-                "InputArtifacts": Array [],
                 "Name": "Source",
                 "OutputArtifacts": Array [
                   Object {
                     "Name": "Source",
                   },
                 ],
+                "RoleArn": Object {
+                  "Fn::GetAtt": Array [
+                    "PipelineSourceCodePipelineActionRoleC6F9E7F5",
+                    "Arn",
+                  ],
+                },
                 "RunOrder": 1,
               },
             ],
@@ -2118,6 +2255,12 @@ Object {
                     "Name": "Build",
                   },
                 ],
+                "RoleArn": Object {
+                  "Fn::GetAtt": Array [
+                    "PipelineBuildCodePipelineActionRoleD77A08E6",
+                    "Arn",
+                  ],
+                },
                 "RunOrder": 1,
               },
             ],
@@ -2150,7 +2293,12 @@ Object {
                   },
                 ],
                 "Name": "Deploy",
-                "OutputArtifacts": Array [],
+                "RoleArn": Object {
+                  "Fn::GetAtt": Array [
+                    "PipelineDeployCodePipelineActionRole8B83082E",
+                    "Arn",
+                  ],
+                },
                 "RunOrder": 1,
               },
             ],
@@ -2160,6 +2308,139 @@ Object {
       },
       "Type": "AWS::CodePipeline::Pipeline",
     },
+    "PipelineDeployCodePipelineActionRole8B83082E": Object {
+      "Properties": Object {
+        "AssumeRolePolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": Object {
+                "AWS": Object {
+                  "Fn::Join": Array [
+                    "",
+                    Array [
+                      "arn:",
+                      Object {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      Object {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":root",
+                    ],
+                  ],
+                },
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "PipelineDeployCodePipelineActionRoleDefaultPolicyEE6D615B": Object {
+      "Properties": Object {
+        "PolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": "iam:PassRole",
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "PipelineDeployRole97597E3E",
+                  "Arn",
+                ],
+              },
+            },
+            Object {
+              "Action": Array [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+              ],
+              "Effect": "Allow",
+              "Resource": Array [
+                Object {
+                  "Fn::GetAtt": Array [
+                    "PipelineArtifactsBucket22248F97",
+                    "Arn",
+                  ],
+                },
+                Object {
+                  "Fn::Join": Array [
+                    "",
+                    Array [
+                      Object {
+                        "Fn::GetAtt": Array [
+                          "PipelineArtifactsBucket22248F97",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            Object {
+              "Action": Array [
+                "kms:Decrypt",
+                "kms:DescribeKey",
+              ],
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "PipelineArtifactsBucketEncryptionKey01D58D69",
+                  "Arn",
+                ],
+              },
+            },
+            Object {
+              "Action": Array [
+                "cloudformation:CreateStack",
+                "cloudformation:DescribeStack*",
+                "cloudformation:GetStackPolicy",
+                "cloudformation:GetTemplate*",
+                "cloudformation:SetStackPolicy",
+                "cloudformation:UpdateStack",
+                "cloudformation:ValidateTemplate",
+              ],
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::Join": Array [
+                  "",
+                  Array [
+                    "arn:",
+                    Object {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":cloudformation:",
+                    Object {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    Object {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":stack/MyStack/*",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "PipelineDeployCodePipelineActionRoleDefaultPolicyEE6D615B",
+        "Roles": Array [
+          Object {
+            "Ref": "PipelineDeployCodePipelineActionRole8B83082E",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
     "PipelineDeployRole97597E3E": Object {
       "Properties": Object {
         "AssumeRolePolicyDocument": Object {
@@ -2168,17 +2449,7 @@ Object {
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": Object {
-                "Service": Object {
-                  "Fn::Join": Array [
-                    "",
-                    Array [
-                      "cloudformation.",
-                      Object {
-                        "Ref": "AWS::URLSuffix",
-                      },
-                    ],
-                  ],
-                },
+                "Service": "cloudformation.amazonaws.com",
               },
             },
           ],
@@ -2191,6 +2462,49 @@ Object {
       "Properties": Object {
         "PolicyDocument": Object {
           "Statement": Array [
+            Object {
+              "Action": Array [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+              ],
+              "Effect": "Allow",
+              "Resource": Array [
+                Object {
+                  "Fn::GetAtt": Array [
+                    "PipelineArtifactsBucket22248F97",
+                    "Arn",
+                  ],
+                },
+                Object {
+                  "Fn::Join": Array [
+                    "",
+                    Array [
+                      Object {
+                        "Fn::GetAtt": Array [
+                          "PipelineArtifactsBucket22248F97",
+                          "Arn",
+                        ],
+                      },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            Object {
+              "Action": Array [
+                "kms:Decrypt",
+                "kms:DescribeKey",
+              ],
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "PipelineArtifactsBucketEncryptionKey01D58D69",
+                  "Arn",
+                ],
+              },
+            },
             Object {
               "Action": "*",
               "Effect": "Allow",
@@ -2216,17 +2530,7 @@ Object {
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": Object {
-                "Service": Object {
-                  "Fn::Join": Array [
-                    "",
-                    Array [
-                      "events.",
-                      Object {
-                        "Ref": "AWS::URLSuffix",
-                      },
-                    ],
-                  ],
-                },
+                "Service": "events.amazonaws.com",
               },
             },
           ],
@@ -2286,14 +2590,131 @@ Object {
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": Object {
-                "Service": Object {
+                "Service": "codepipeline.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "PipelineRoleDefaultPolicyC7A05455": Object {
+      "Properties": Object {
+        "PolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": Array [
+                "s3:GetObject*",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*",
+                "s3:PutObject*",
+                "s3:Abort*",
+              ],
+              "Effect": "Allow",
+              "Resource": Array [
+                Object {
+                  "Fn::GetAtt": Array [
+                    "PipelineArtifactsBucket22248F97",
+                    "Arn",
+                  ],
+                },
+                Object {
                   "Fn::Join": Array [
                     "",
                     Array [
-                      "codepipeline.",
                       Object {
-                        "Ref": "AWS::URLSuffix",
+                        "Fn::GetAtt": Array [
+                          "PipelineArtifactsBucket22248F97",
+                          "Arn",
+                        ],
                       },
+                      "/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            Object {
+              "Action": Array [
+                "kms:Decrypt",
+                "kms:DescribeKey",
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+              ],
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "PipelineArtifactsBucketEncryptionKey01D58D69",
+                  "Arn",
+                ],
+              },
+            },
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "PipelineSourceCodePipelineActionRoleC6F9E7F5",
+                  "Arn",
+                ],
+              },
+            },
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "PipelineBuildCodePipelineActionRoleD77A08E6",
+                  "Arn",
+                ],
+              },
+            },
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "PipelineDeployCodePipelineActionRole8B83082E",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "PipelineRoleDefaultPolicyC7A05455",
+        "Roles": Array [
+          Object {
+            "Ref": "PipelineRoleD68726F7",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "PipelineSourceCodePipelineActionRoleC6F9E7F5": Object {
+      "Properties": Object {
+        "AssumeRolePolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": Object {
+                "AWS": Object {
+                  "Fn::Join": Array [
+                    "",
+                    Array [
+                      "arn:",
+                      Object {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      Object {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":root",
                     ],
                   ],
                 },
@@ -2305,7 +2726,7 @@ Object {
       },
       "Type": "AWS::IAM::Role",
     },
-    "PipelineRoleDefaultPolicyC7A05455": Object {
+    "PipelineSourceCodePipelineActionRoleDefaultPolicy2D565925": Object {
       "Properties": Object {
         "PolicyDocument": Object {
           "Statement": Array [
@@ -2374,69 +2795,13 @@ Object {
                 ],
               },
             },
-            Object {
-              "Action": Array [
-                "codebuild:BatchGetBuilds",
-                "codebuild:StartBuild",
-                "codebuild:StopBuild",
-              ],
-              "Effect": "Allow",
-              "Resource": Object {
-                "Fn::GetAtt": Array [
-                  "BuildProject097C5DB7",
-                  "Arn",
-                ],
-              },
-            },
-            Object {
-              "Action": "iam:PassRole",
-              "Effect": "Allow",
-              "Resource": Object {
-                "Fn::GetAtt": Array [
-                  "PipelineDeployRole97597E3E",
-                  "Arn",
-                ],
-              },
-            },
-            Object {
-              "Action": Array [
-                "cloudformation:CreateStack",
-                "cloudformation:DescribeStack*",
-                "cloudformation:GetStackPolicy",
-                "cloudformation:GetTemplate*",
-                "cloudformation:SetStackPolicy",
-                "cloudformation:UpdateStack",
-                "cloudformation:ValidateTemplate",
-              ],
-              "Effect": "Allow",
-              "Resource": Object {
-                "Fn::Join": Array [
-                  "",
-                  Array [
-                    "arn:",
-                    Object {
-                      "Ref": "AWS::Partition",
-                    },
-                    ":cloudformation:",
-                    Object {
-                      "Ref": "AWS::Region",
-                    },
-                    ":",
-                    Object {
-                      "Ref": "AWS::AccountId",
-                    },
-                    ":stack/MyStack/*",
-                  ],
-                ],
-              },
-            },
           ],
           "Version": "2012-10-17",
         },
-        "PolicyName": "PipelineRoleDefaultPolicyC7A05455",
+        "PolicyName": "PipelineSourceCodePipelineActionRoleDefaultPolicy2D565925",
         "Roles": Array [
           Object {
-            "Ref": "PipelineRoleD68726F7",
+            "Ref": "PipelineSourceCodePipelineActionRoleC6F9E7F5",
           },
         ],
       },
@@ -2445,7 +2810,6 @@ Object {
     "Repo02AC86CF": Object {
       "Properties": Object {
         "RepositoryName": "my-first-decdk-repo",
-        "Triggers": Array [],
       },
       "Type": "AWS::CodeCommit::Repository",
     },
@@ -2502,7 +2866,7 @@ Object {
                 ],
               ],
             },
-            "Id": "Pipeline",
+            "Id": "Target0",
             "RoleArn": Object {
               "Fn::GetAtt": Array [
                 "PipelineEventsRole46BEEA7C",
@@ -2570,6 +2934,9 @@ Object {
                 "kms:Delete*",
                 "kms:ScheduleKeyDeletion",
                 "kms:CancelKeyDeletion",
+                "kms:GenerateDataKey",
+                "kms:TagResource",
+                "kms:UntagResource",
               ],
               "Effect": "Allow",
               "Principal": Object {
@@ -2597,6 +2964,7 @@ Object {
         },
       },
       "Type": "AWS::KMS::Key",
+      "UpdateReplacePolicy": "Retain",
     },
   },
 }
@@ -2670,14 +3038,17 @@ Object {
     },
     "VPCPrivateSubnet1Subnet8BCA10E0": Object {
       "Properties": Object {
-        "AvailabilityZone": "dummy1a",
-        "CidrBlock": "10.0.96.0/19",
+        "AvailabilityZone": Object {
+          "Fn::Select": Array [
+            0,
+            Object {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.128.0/18",
         "MapPublicIpOnLaunch": false,
         "Tags": Array [
-          Object {
-            "Key": "Name",
-            "Value": "vpc/VPC/PrivateSubnet1",
-          },
           Object {
             "Key": "aws-cdk:subnet-name",
             "Value": "Private",
@@ -2685,6 +3056,10 @@ Object {
           Object {
             "Key": "aws-cdk:subnet-type",
             "Value": "Private",
+          },
+          Object {
+            "Key": "Name",
+            "Value": "vpc/VPC/PrivateSubnet1",
           },
         ],
         "VpcId": Object {
@@ -2732,83 +3107,28 @@ Object {
     },
     "VPCPrivateSubnet2SubnetCFCDAA7A": Object {
       "Properties": Object {
-        "AvailabilityZone": "dummy1b",
-        "CidrBlock": "10.0.128.0/19",
+        "AvailabilityZone": Object {
+          "Fn::Select": Array [
+            1,
+            Object {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.192.0/18",
         "MapPublicIpOnLaunch": false,
         "Tags": Array [
+          Object {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Private",
+          },
+          Object {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Private",
+          },
           Object {
             "Key": "Name",
             "Value": "vpc/VPC/PrivateSubnet2",
-          },
-          Object {
-            "Key": "aws-cdk:subnet-name",
-            "Value": "Private",
-          },
-          Object {
-            "Key": "aws-cdk:subnet-type",
-            "Value": "Private",
-          },
-        ],
-        "VpcId": Object {
-          "Ref": "VPCB9E5F0B4",
-        },
-      },
-      "Type": "AWS::EC2::Subnet",
-    },
-    "VPCPrivateSubnet3DefaultRoute27F311AE": Object {
-      "Properties": Object {
-        "DestinationCidrBlock": "0.0.0.0/0",
-        "NatGatewayId": Object {
-          "Ref": "VPCPublicSubnet3NATGatewayD3048F5C",
-        },
-        "RouteTableId": Object {
-          "Ref": "VPCPrivateSubnet3RouteTable192186F8",
-        },
-      },
-      "Type": "AWS::EC2::Route",
-    },
-    "VPCPrivateSubnet3RouteTable192186F8": Object {
-      "Properties": Object {
-        "Tags": Array [
-          Object {
-            "Key": "Name",
-            "Value": "vpc/VPC/PrivateSubnet3",
-          },
-        ],
-        "VpcId": Object {
-          "Ref": "VPCB9E5F0B4",
-        },
-      },
-      "Type": "AWS::EC2::RouteTable",
-    },
-    "VPCPrivateSubnet3RouteTableAssociationC28D144E": Object {
-      "Properties": Object {
-        "RouteTableId": Object {
-          "Ref": "VPCPrivateSubnet3RouteTable192186F8",
-        },
-        "SubnetId": Object {
-          "Ref": "VPCPrivateSubnet3Subnet3EDCD457",
-        },
-      },
-      "Type": "AWS::EC2::SubnetRouteTableAssociation",
-    },
-    "VPCPrivateSubnet3Subnet3EDCD457": Object {
-      "Properties": Object {
-        "AvailabilityZone": "dummy1c",
-        "CidrBlock": "10.0.160.0/19",
-        "MapPublicIpOnLaunch": false,
-        "Tags": Array [
-          Object {
-            "Key": "Name",
-            "Value": "vpc/VPC/PrivateSubnet3",
-          },
-          Object {
-            "Key": "aws-cdk:subnet-name",
-            "Value": "Private",
-          },
-          Object {
-            "Key": "aws-cdk:subnet-type",
-            "Value": "Private",
           },
         ],
         "VpcId": Object {
@@ -2835,6 +3155,12 @@ Object {
     "VPCPublicSubnet1EIP6AD938E8": Object {
       "Properties": Object {
         "Domain": "vpc",
+        "Tags": Array [
+          Object {
+            "Key": "Name",
+            "Value": "vpc/VPC/PublicSubnet1",
+          },
+        ],
       },
       "Type": "AWS::EC2::EIP",
     },
@@ -2885,14 +3211,17 @@ Object {
     },
     "VPCPublicSubnet1SubnetB4246D30": Object {
       "Properties": Object {
-        "AvailabilityZone": "dummy1a",
-        "CidrBlock": "10.0.0.0/19",
+        "AvailabilityZone": Object {
+          "Fn::Select": Array [
+            0,
+            Object {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.0.0/18",
         "MapPublicIpOnLaunch": true,
         "Tags": Array [
-          Object {
-            "Key": "Name",
-            "Value": "vpc/VPC/PublicSubnet1",
-          },
           Object {
             "Key": "aws-cdk:subnet-name",
             "Value": "Public",
@@ -2900,6 +3229,10 @@ Object {
           Object {
             "Key": "aws-cdk:subnet-type",
             "Value": "Public",
+          },
+          Object {
+            "Key": "Name",
+            "Value": "vpc/VPC/PublicSubnet1",
           },
         ],
         "VpcId": Object {
@@ -2926,6 +3259,12 @@ Object {
     "VPCPublicSubnet2EIP4947BC00": Object {
       "Properties": Object {
         "Domain": "vpc",
+        "Tags": Array [
+          Object {
+            "Key": "Name",
+            "Value": "vpc/VPC/PublicSubnet2",
+          },
+        ],
       },
       "Type": "AWS::EC2::EIP",
     },
@@ -2976,112 +3315,28 @@ Object {
     },
     "VPCPublicSubnet2Subnet74179F39": Object {
       "Properties": Object {
-        "AvailabilityZone": "dummy1b",
-        "CidrBlock": "10.0.32.0/19",
+        "AvailabilityZone": Object {
+          "Fn::Select": Array [
+            1,
+            Object {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.64.0/18",
         "MapPublicIpOnLaunch": true,
         "Tags": Array [
+          Object {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Public",
+          },
+          Object {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public",
+          },
           Object {
             "Key": "Name",
             "Value": "vpc/VPC/PublicSubnet2",
-          },
-          Object {
-            "Key": "aws-cdk:subnet-name",
-            "Value": "Public",
-          },
-          Object {
-            "Key": "aws-cdk:subnet-type",
-            "Value": "Public",
-          },
-        ],
-        "VpcId": Object {
-          "Ref": "VPCB9E5F0B4",
-        },
-      },
-      "Type": "AWS::EC2::Subnet",
-    },
-    "VPCPublicSubnet3DefaultRouteA0D29D46": Object {
-      "DependsOn": Array [
-        "VPCVPCGW99B986DC",
-      ],
-      "Properties": Object {
-        "DestinationCidrBlock": "0.0.0.0/0",
-        "GatewayId": Object {
-          "Ref": "VPCIGWB7E252D3",
-        },
-        "RouteTableId": Object {
-          "Ref": "VPCPublicSubnet3RouteTable98AE0E14",
-        },
-      },
-      "Type": "AWS::EC2::Route",
-    },
-    "VPCPublicSubnet3EIPAD4BC883": Object {
-      "Properties": Object {
-        "Domain": "vpc",
-      },
-      "Type": "AWS::EC2::EIP",
-    },
-    "VPCPublicSubnet3NATGatewayD3048F5C": Object {
-      "Properties": Object {
-        "AllocationId": Object {
-          "Fn::GetAtt": Array [
-            "VPCPublicSubnet3EIPAD4BC883",
-            "AllocationId",
-          ],
-        },
-        "SubnetId": Object {
-          "Ref": "VPCPublicSubnet3Subnet631C5E25",
-        },
-        "Tags": Array [
-          Object {
-            "Key": "Name",
-            "Value": "vpc/VPC/PublicSubnet3",
-          },
-        ],
-      },
-      "Type": "AWS::EC2::NatGateway",
-    },
-    "VPCPublicSubnet3RouteTable98AE0E14": Object {
-      "Properties": Object {
-        "Tags": Array [
-          Object {
-            "Key": "Name",
-            "Value": "vpc/VPC/PublicSubnet3",
-          },
-        ],
-        "VpcId": Object {
-          "Ref": "VPCB9E5F0B4",
-        },
-      },
-      "Type": "AWS::EC2::RouteTable",
-    },
-    "VPCPublicSubnet3RouteTableAssociation427FE0C6": Object {
-      "Properties": Object {
-        "RouteTableId": Object {
-          "Ref": "VPCPublicSubnet3RouteTable98AE0E14",
-        },
-        "SubnetId": Object {
-          "Ref": "VPCPublicSubnet3Subnet631C5E25",
-        },
-      },
-      "Type": "AWS::EC2::SubnetRouteTableAssociation",
-    },
-    "VPCPublicSubnet3Subnet631C5E25": Object {
-      "Properties": Object {
-        "AvailabilityZone": "dummy1c",
-        "CidrBlock": "10.0.64.0/19",
-        "MapPublicIpOnLaunch": true,
-        "Tags": Array [
-          Object {
-            "Key": "Name",
-            "Value": "vpc/VPC/PublicSubnet3",
-          },
-          Object {
-            "Key": "aws-cdk:subnet-name",
-            "Value": "Public",
-          },
-          Object {
-            "Key": "aws-cdk:subnet-type",
-            "Value": "Public",
           },
         ],
         "VpcId": Object {

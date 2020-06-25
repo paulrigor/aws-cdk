@@ -1,4 +1,4 @@
-import { IResource } from '@aws-cdk/cdk';
+import { IResource } from '@aws-cdk/core';
 
 /**
  * Imported or created hosted zone
@@ -15,6 +15,13 @@ export interface IHostedZone extends IResource {
    * FQDN of this hosted zone
    */
   readonly zoneName: string;
+
+  /**
+   * ARN of this hosted zone, such as arn:${Partition}:route53:::hostedzone/${Id}
+   *
+   * @attribute
+   */
+  readonly hostedZoneArn: string;
 
   /**
    * Returns the set of name servers for the specific hosted zone. For example:

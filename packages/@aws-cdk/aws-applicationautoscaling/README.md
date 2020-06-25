@@ -1,20 +1,17 @@
 ## AWS Auto Scaling Construct Library
 <!--BEGIN STABILITY BANNER-->
-
 ---
 
-![Stability: Experimental](https://img.shields.io/badge/stability-Experimental-important.svg?style=for-the-badge)
+![cfn-resources: Stable](https://img.shields.io/badge/cfn--resources-stable-success.svg?style=for-the-badge)
 
-> This API is still under active development and subject to non-backward
-> compatible changes or removal in any future version. Use of the API is not recommended in production
-> environments. Experimental APIs are not subject to the Semantic Versioning model.
+![cdk-constructs: Stable](https://img.shields.io/badge/cdk--constructs-stable-success.svg?style=for-the-badge)
 
 ---
 <!--END STABILITY BANNER-->
 
 **Application AutoScaling** is used to configure autoscaling for all
 services other than scaling EC2 instances. For example, you will use this to
-scale ECS tasks, DynamoDB capacity, Spot Fleet sizes and more.
+scale ECS tasks, DynamoDB capacity, Spot Fleet sizes, Comprehend document classification endpoints, Lambda function provisioned concurrency and more.
 
 As a CDK user, you will probably not have to interact with this library
 directly; instead, it will be used by other construct libraries to
@@ -65,7 +62,7 @@ capacity.scaleOnSchedule(...);
 
 ### Step Scaling
 
-This type of scaling scales in and out in deterministics steps that you
+This type of scaling scales in and out in deterministic steps that you
 configure, in response to metric values. For example, your scaling strategy
 to scale in response to CPU usage might look like this:
 
@@ -93,7 +90,7 @@ capacity.scaleOnMetric('ScaleToCPU', {
 
   // Change this to AdjustmentType.PercentChangeInCapacity to interpret the
   // 'change' numbers before as percentages instead of capacity counts.
-  adjustmentType: autoscaling.AdjustmentType.ChangeInCapacity,
+  adjustmentType: autoscaling.AdjustmentType.CHANGE_IN_CAPACITY,
 });
 ```
 
@@ -112,7 +109,7 @@ The following example configures the read capacity of a DynamoDB table
 to be around 60% utilization:
 
 ```ts
-const readCapacity = table.autosScaleReadCapacity({
+const readCapacity = table.autoScaleReadCapacity({
   minCapacity: 10,
   maxCapacity: 1000
 });
@@ -140,7 +137,7 @@ The following schedule expressions can be used:
 * `cron(mm hh dd mm dow)` -- scale on arbitrary schedules
 
 Of these, the cron expression is the most useful but also the most
-complicated. There is a `Cron` helper class to help build cron expressions.
+complicated. A schedule is expressed as a cron expression. The `Schedule` class has a `cron` method to help build cron expressions.
 
 The following example scales the fleet out in the morning, and lets natural
 scaling take over at night:
@@ -152,11 +149,50 @@ const capacity = resource.autoScaleCapacity({
 });
 
 capacity.scaleOnSchedule('PrescaleInTheMorning', {
-  schedule: autoscaling.Cron.dailyUtc(8),
+  schedule: autoscaling.Schedule.cron({ hour: '8', minute: '0' }),
   minCapacity: 20,
 });
 
 capacity.scaleOnSchedule('AllowDownscalingAtNight', {
-  schedule: autoscaling.Cron.dailyUtc(20),
+  schedule: autoscaling.Schedule.cron({ hour: '20', minute: '0' }),
   minCapacity: 1
 });
+```
+
+## Examples
+
+### Lambda Provisioned Concurrency Auto Scaling
+
+```ts
+   const handler = new lambda.Function(this, 'MyFunction', {
+      runtime: lambda.Runtime.PYTHON_3_7,
+      handler: 'index.handler',
+      code: new lambda.InlineCode(`
+import json, time
+def handler(event, context):
+    time.sleep(1)
+    return {
+        'statusCode': 200,
+        'body': json.dumps('Hello CDK from Lambda!')
+    }`),
+      reservedConcurrentExecutions: 2,
+    });
+    
+    const fnVer = handler.addVersion('CDKLambdaVersion', undefined, 'demo alias', 10);
+
+    new apigateway.LambdaRestApi(this, 'API', { handler: fnVer })
+
+    const target = new applicationautoscaling.ScalableTarget(this, 'ScalableTarget', {
+      serviceNamespace: applicationautoscaling.ServiceNamespace.LAMBDA,
+      maxCapacity: 100,
+      minCapacity: 10,
+      resourceId: `function:${handler.functionName}:${fnVer.version}`,
+      scalableDimension: 'lambda:function:ProvisionedConcurrency',
+    })
+s
+    target.scaleToTrackMetric('PceTracking', {
+      targetValue: 0.9,
+      predefinedMetric: applicationautoscaling.PredefinedMetric.LAMBDA_PROVISIONED_CONCURRENCY_UTILIZATION,
+    })
+  }
+  ```

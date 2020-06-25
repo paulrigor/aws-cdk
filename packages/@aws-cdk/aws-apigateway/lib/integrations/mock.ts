@@ -15,8 +15,8 @@ import { Integration, IntegrationOptions, IntegrationType } from '../integration
 export class MockIntegration extends Integration {
   constructor(options?: IntegrationOptions) {
     super({
-      type: IntegrationType.Mock,
-      options
+      type: IntegrationType.MOCK,
+      options,
     });
   }
 }

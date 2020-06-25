@@ -1,10 +1,9 @@
 import { SynthUtils } from '@aws-cdk/assert';
 import '@aws-cdk/assert/jest';
-import s3 = require('@aws-cdk/aws-s3');
-import sns = require('@aws-cdk/aws-sns');
-import cdk = require('@aws-cdk/cdk');
-import { ConstructNode, Stack } from '@aws-cdk/cdk';
-import s3n = require('../lib');
+import * as s3 from '@aws-cdk/aws-s3';
+import * as sns from '@aws-cdk/aws-sns';
+import * as cdk from '@aws-cdk/core';
+import * as s3n from '../lib';
 
 // tslint:disable:object-literal-key-quotes
 // tslint:disable:max-line-length
@@ -15,12 +14,13 @@ test('bucket without notifications', () => {
   new s3.Bucket(stack, 'MyBucket');
 
   expect(stack).toMatchTemplate({
-    "Resources": {
-      "MyBucketF68F3FF0": {
-        "Type": "AWS::S3::Bucket",
-        "DeletionPolicy": "Retain"
-      }
-    }
+    'Resources': {
+      'MyBucketF68F3FF0': {
+        'Type': 'AWS::S3::Bucket',
+        'DeletionPolicy': 'Retain',
+        'UpdateReplacePolicy': 'Retain',
+      },
+    },
   });
 });
 
@@ -30,7 +30,7 @@ test('when notification are added, a custom resource is provisioned + a lambda h
   const bucket = new s3.Bucket(stack, 'MyBucket');
   const topic = new sns.Topic(stack, 'MyTopic');
 
-  bucket.addEventNotification(s3.EventType.ObjectCreated, new s3n.SnsDestination(topic));
+  bucket.addEventNotification(s3.EventType.OBJECT_CREATED, new s3n.SnsDestination(topic));
 
   expect(stack).toHaveResource('AWS::S3::Bucket');
   expect(stack).toHaveResource('AWS::Lambda::Function', { Description: 'AWS CloudFormation handler for "Custom::S3BucketNotifications" resources (@aws-cdk/aws-s3)' });
@@ -45,7 +45,7 @@ test('when notification are added, you can tag the lambda', () => {
 
   const topic = new sns.Topic(stack, 'MyTopic');
 
-  bucket.addEventNotification(s3.EventType.ObjectCreated, new s3n.SnsDestination(topic));
+  bucket.addEventNotification(s3.EventType.OBJECT_CREATED, new s3n.SnsDestination(topic));
 
   expect(stack).toHaveResource('AWS::S3::Bucket');
   expect(stack).toHaveResource('AWS::Lambda::Function', {
@@ -66,36 +66,36 @@ test('bucketNotificationTarget is not called during synthesis', () => {
   bucket.addObjectCreatedNotification(new s3n.SnsDestination(topic));
 
   expect(stack).toHaveResourceLike('AWS::SNS::TopicPolicy', {
-    "Topics": [
-    {
-      "Ref": "TopicBFC7AF6E"
-    }
-    ],
-    "PolicyDocument": {
-    "Statement": [
+    'Topics': [
       {
-      "Action": "sns:Publish",
-      "Condition": {
-        "ArnLike": {
-        "aws:SourceArn": {
-          "Fn::GetAtt": [
-          "MyBucketF68F3FF0",
-          "Arn"
-          ]
-        }
-        }
+        'Ref': 'TopicBFC7AF6E',
       },
-      "Effect": "Allow",
-      "Principal": {
-        "Service": { "Fn::Join": ["", ["s3.", { Ref: "AWS::URLSuffix" }]] }
-      },
-      "Resource": {
-        "Ref": "TopicBFC7AF6E"
-      },
-      }
     ],
-    "Version": "2012-10-17"
-    }
+    'PolicyDocument': {
+      'Statement': [
+        {
+          'Action': 'sns:Publish',
+          'Condition': {
+            'ArnLike': {
+              'aws:SourceArn': {
+                'Fn::GetAtt': [
+                  'MyBucketF68F3FF0',
+                  'Arn',
+                ],
+              },
+            },
+          },
+          'Effect': 'Allow',
+          'Principal': {
+            'Service': 's3.amazonaws.com',
+          },
+          'Resource': {
+            'Ref': 'TopicBFC7AF6E',
+          },
+        },
+      ],
+      'Version': '2012-10-17',
+    },
   });
 });
 
@@ -106,75 +106,75 @@ test('subscription types', () => {
 
   const queueTarget: s3.IBucketNotificationDestination = {
     bind: _ => ({
-      type: s3.BucketNotificationDestinationType.Queue,
-      arn: 'arn:aws:sqs:...'
-    })
+      type: s3.BucketNotificationDestinationType.QUEUE,
+      arn: 'arn:aws:sqs:...',
+    }),
   };
 
   const lambdaTarget: s3.IBucketNotificationDestination = {
     bind: _ => ({
-      type: s3.BucketNotificationDestinationType.Lambda,
-      arn: 'arn:aws:lambda:...'
-    })
+      type: s3.BucketNotificationDestinationType.LAMBDA,
+      arn: 'arn:aws:lambda:...',
+    }),
   };
 
   const topicTarget: s3.IBucketNotificationDestination = {
     bind: _ => ({
-      type: s3.BucketNotificationDestinationType.Topic,
-      arn: 'arn:aws:sns:...'
-    })
+      type: s3.BucketNotificationDestinationType.TOPIC,
+      arn: 'arn:aws:sns:...',
+    }),
   };
 
-  bucket.addEventNotification(s3.EventType.ObjectCreated, queueTarget);
-  bucket.addEventNotification(s3.EventType.ObjectCreated, lambdaTarget);
+  bucket.addEventNotification(s3.EventType.OBJECT_CREATED, queueTarget);
+  bucket.addEventNotification(s3.EventType.OBJECT_CREATED, lambdaTarget);
   bucket.addObjectRemovedNotification(topicTarget, { prefix: 'prefix' });
 
   expect(stack).toHaveResource('Custom::S3BucketNotifications', {
-    "ServiceToken": {
-    "Fn::GetAtt": [
-      "BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691",
-      "Arn"
-    ]
+    'ServiceToken': {
+      'Fn::GetAtt': [
+        'BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691',
+        'Arn',
+      ],
     },
-    "BucketName": {
-    "Ref": "TestBucket560B80BC"
+    'BucketName': {
+      'Ref': 'TestBucket560B80BC',
     },
-    "NotificationConfiguration": {
-    "LambdaFunctionConfigurations": [
-      {
-      "Events": [
-        "s3:ObjectCreated:*"
+    'NotificationConfiguration': {
+      'LambdaFunctionConfigurations': [
+        {
+          'Events': [
+            's3:ObjectCreated:*',
+          ],
+          'LambdaFunctionArn': 'arn:aws:lambda:...',
+        },
       ],
-      "LambdaFunctionArn": "arn:aws:lambda:..."
-      }
-    ],
-    "QueueConfigurations": [
-      {
-      "Events": [
-        "s3:ObjectCreated:*"
+      'QueueConfigurations': [
+        {
+          'Events': [
+            's3:ObjectCreated:*',
+          ],
+          'QueueArn': 'arn:aws:sqs:...',
+        },
       ],
-      "QueueArn": "arn:aws:sqs:..."
-      }
-    ],
-    "TopicConfigurations": [
-      {
-      "Events": [
-        "s3:ObjectRemoved:*"
+      'TopicConfigurations': [
+        {
+          'Events': [
+            's3:ObjectRemoved:*',
+          ],
+          'TopicArn': 'arn:aws:sns:...',
+          'Filter': {
+            'Key': {
+              'FilterRules': [
+                {
+                  'Name': 'prefix',
+                  'Value': 'prefix',
+                },
+              ],
+            },
+          },
+        },
       ],
-      "TopicArn": "arn:aws:sns:...",
-      "Filter": {
-        "Key": {
-        "FilterRules": [
-          {
-          "Name": "prefix",
-          "Value": "prefix"
-          }
-        ]
-        }
-      }
-      }
-    ]
-    }
+    },
   });
 });
 
@@ -183,46 +183,46 @@ test('multiple subscriptions of the same type', () => {
 
   const bucket = new s3.Bucket(stack, 'TestBucket');
 
-  bucket.addEventNotification(s3.EventType.ObjectRemovedDelete, {
+  bucket.addEventNotification(s3.EventType.OBJECT_REMOVED_DELETE, {
     bind: _ => ({
-      type: s3.BucketNotificationDestinationType.Queue,
-      arn: 'arn:aws:sqs:...:queue1'
-    })
+      type: s3.BucketNotificationDestinationType.QUEUE,
+      arn: 'arn:aws:sqs:...:queue1',
+    }),
   });
 
-  bucket.addEventNotification(s3.EventType.ObjectRemovedDelete, {
+  bucket.addEventNotification(s3.EventType.OBJECT_REMOVED_DELETE, {
     bind: _ => ({
-      type: s3.BucketNotificationDestinationType.Queue,
-      arn: 'arn:aws:sqs:...:queue2'
-    })
+      type: s3.BucketNotificationDestinationType.QUEUE,
+      arn: 'arn:aws:sqs:...:queue2',
+    }),
   });
 
   expect(stack).toHaveResource('Custom::S3BucketNotifications', {
-    "ServiceToken": {
-    "Fn::GetAtt": [
-      "BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691",
-      "Arn"
-    ]
-    },
-    "BucketName": {
-    "Ref": "TestBucket560B80BC"
-    },
-    "NotificationConfiguration": {
-    "QueueConfigurations": [
-      {
-      "Events": [
-        "s3:ObjectRemoved:Delete"
+    'ServiceToken': {
+      'Fn::GetAtt': [
+        'BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691',
+        'Arn',
       ],
-      "QueueArn": "arn:aws:sqs:...:queue1"
-      },
-      {
-      "Events": [
-        "s3:ObjectRemoved:Delete"
+    },
+    'BucketName': {
+      'Ref': 'TestBucket560B80BC',
+    },
+    'NotificationConfiguration': {
+      'QueueConfigurations': [
+        {
+          'Events': [
+            's3:ObjectRemoved:Delete',
+          ],
+          'QueueArn': 'arn:aws:sqs:...:queue1',
+        },
+        {
+          'Events': [
+            's3:ObjectRemoved:Delete',
+          ],
+          'QueueArn': 'arn:aws:sqs:...:queue2',
+        },
       ],
-      "QueueArn": "arn:aws:sqs:...:queue2"
-      }
-    ]
-    }
+    },
   });
 });
 
@@ -232,109 +232,109 @@ test('prefix/suffix filters', () => {
   const bucket = new s3.Bucket(stack, 'TestBucket');
 
   const bucketNotificationTarget = {
-    type: s3.BucketNotificationDestinationType.Queue,
-    arn: 'arn:aws:sqs:...'
+    type: s3.BucketNotificationDestinationType.QUEUE,
+    arn: 'arn:aws:sqs:...',
   };
 
-  bucket.addEventNotification(s3.EventType.ObjectRemovedDelete, { bind: _ => bucketNotificationTarget }, { prefix: 'images/', suffix: '.jpg' });
+  bucket.addEventNotification(s3.EventType.OBJECT_REMOVED_DELETE, { bind: _ => bucketNotificationTarget }, { prefix: 'images/', suffix: '.jpg' });
 
   expect(stack).toHaveResource('Custom::S3BucketNotifications', {
-    "ServiceToken": {
-    "Fn::GetAtt": [
-      "BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691",
-      "Arn"
-    ]
-    },
-    "BucketName": {
-    "Ref": "TestBucket560B80BC"
-    },
-    "NotificationConfiguration": {
-    "QueueConfigurations": [
-      {
-      "Events": [
-        "s3:ObjectRemoved:Delete"
+    'ServiceToken': {
+      'Fn::GetAtt': [
+        'BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691',
+        'Arn',
       ],
-      "Filter": {
-        "Key": {
-        "FilterRules": [
-          {
-          "Name": "suffix",
-          "Value": ".jpg"
+    },
+    'BucketName': {
+      'Ref': 'TestBucket560B80BC',
+    },
+    'NotificationConfiguration': {
+      'QueueConfigurations': [
+        {
+          'Events': [
+            's3:ObjectRemoved:Delete',
+          ],
+          'Filter': {
+            'Key': {
+              'FilterRules': [
+                {
+                  'Name': 'suffix',
+                  'Value': '.jpg',
+                },
+                {
+                  'Name': 'prefix',
+                  'Value': 'images/',
+                },
+              ],
+            },
           },
-          {
-          "Name": "prefix",
-          "Value": "images/"
-          }
-        ]
-        }
-      },
-      "QueueArn": "arn:aws:sqs:..."
-      }
-    ]
-    }
+          'QueueArn': 'arn:aws:sqs:...',
+        },
+      ],
+    },
   });
 });
 
 test('a notification destination can specify a set of dependencies that must be resolved before the notifications resource is created', () => {
-  const stack = new Stack();
+  const stack = new cdk.Stack();
 
   const bucket = new s3.Bucket(stack, 'Bucket');
   const dependent = new cdk.CfnResource(stack, 'Dependent', { type: 'DependOnMe' });
   const dest: s3.IBucketNotificationDestination = {
     bind: () => ({
       arn: 'arn',
-      type: s3.BucketNotificationDestinationType.Queue,
-      dependencies: [ dependent ]
-    })
+      type: s3.BucketNotificationDestinationType.QUEUE,
+      dependencies: [ dependent ],
+    }),
   };
 
   bucket.addObjectCreatedNotification(dest);
 
-  ConstructNode.prepare(stack.node);
+  cdk.ConstructNode.prepare(stack.node);
 
   expect(SynthUtils.synthesize(stack).template.Resources.BucketNotifications8F2E257D).toEqual({
     Type: 'Custom::S3BucketNotifications',
     Properties: {
       ServiceToken: { 'Fn::GetAtt': [ 'BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691', 'Arn' ] },
       BucketName: { Ref: 'Bucket83908E77' },
-      NotificationConfiguration: { QueueConfigurations: [ { Events: [ 's3:ObjectCreated:*' ], QueueArn: 'arn' } ] }
+      NotificationConfiguration: { QueueConfigurations: [ { Events: [ 's3:ObjectCreated:*' ], QueueArn: 'arn' } ] },
     },
-    DependsOn: [ 'Dependent' ]
+    DependsOn: [ 'Dependent' ],
   });
 });
 
 describe('CloudWatch Events', () => {
-  test('onPutItem contains the Bucket ARN itself when path is undefined', () => {
+  test('onCloudTrailPutObject contains the Bucket ARN itself when path is undefined', () => {
     const stack = new cdk.Stack();
     const bucket = s3.Bucket.fromBucketAttributes(stack, 'Bucket', {
       bucketName: 'MyBucket',
     });
     bucket.onCloudTrailPutObject('PutRule', {
       target: {
-        bind: () => ({ arn: 'ARN', id: 'ID' })
-      }
+        bind: () => ({ arn: 'ARN', id: '' }),
+      },
     });
 
     expect(stack).toHaveResourceLike('AWS::Events::Rule', {
-      "EventPattern": {
-        "source": [
-          "aws.s3",
+      'EventPattern': {
+        'source': [
+          'aws.s3',
         ],
-        "detail": {
-          "eventName": [
-            "PutObject",
+        'detail': {
+          'eventName': [
+            'PutObject',
           ],
-          "resources": {
-            "ARN": [
+          'resources': {
+            'ARN': [
               {
-                "Fn::Join": [
-                  "",
+                'Fn::Join': [
+                  '',
                   [
-                    "arn:",
+                    'arn:',
                     {
-                      "Ref": "AWS::Partition",
+                      'Ref': 'AWS::Partition',
                     },
-                    ":s3:::MyBucket",
+                    ':s3:::MyBucket',
                   ],
                 ],
               },
@@ -342,42 +342,42 @@ describe('CloudWatch Events', () => {
           },
         },
       },
-      "State": "ENABLED",
+      'State': 'ENABLED',
     });
   });
 
-  test("onPutItem contains the path when it's provided", () => {
+  test("onCloudTrailPutObject contains the path when it's provided", () => {
     const stack = new cdk.Stack();
     const bucket = s3.Bucket.fromBucketAttributes(stack, 'Bucket', {
       bucketName: 'MyBucket',
     });
     bucket.onCloudTrailPutObject('PutRule', {
       target: {
-        bind: () => ({ arn: 'ARN', id: 'ID' })
+        bind: () => ({ arn: 'ARN', id: '' }),
       },
-      paths: ['my/path.zip']
+      paths: ['my/path.zip'],
     });
 
     expect(stack).toHaveResourceLike('AWS::Events::Rule', {
-      "EventPattern": {
-        "source": [
-          "aws.s3",
+      'EventPattern': {
+        'source': [
+          'aws.s3',
         ],
-        "detail": {
-          "eventName": [
-            "PutObject",
+        'detail': {
+          'eventName': [
+            'PutObject',
           ],
-          "resources": {
-            "ARN": [
+          'resources': {
+            'ARN': [
               {
-                "Fn::Join": [
-                  "",
+                'Fn::Join': [
+                  '',
                   [
-                    "arn:",
+                    'arn:',
                     {
-                      "Ref": "AWS::Partition",
+                      'Ref': 'AWS::Partition',
                     },
-                    ":s3:::MyBucket/my/path.zip"
+                    ':s3:::MyBucket/my/path.zip',
                   ],
                 ],
               },
@@ -385,7 +385,93 @@ describe('CloudWatch Events', () => {
           },
         },
       },
-      "State": "ENABLED",
+      'State': 'ENABLED',
+    });
+  });
+
+  test('onCloudTrailWriteObject matches on events CompleteMultipartUpload, CopyObject, and PutObject', () => {
+    const stack = new cdk.Stack();
+    const bucket = s3.Bucket.fromBucketAttributes(stack, 'Bucket', {
+      bucketName: 'MyBucket',
+    });
+    bucket.onCloudTrailWriteObject('OnCloudTrailWriteObjectRule', {
+      target: {
+        bind: () => ({ arn: 'ARN', id: '' }),
+      },
+    });
+
+    expect(stack).toHaveResourceLike('AWS::Events::Rule', {
+      'EventPattern': {
+        'source': [
+          'aws.s3',
+        ],
+        'detail': {
+          'eventName': [
+            'CompleteMultipartUpload',
+            'CopyObject',
+            'PutObject',
+          ],
+        },
+      },
+      'State': 'ENABLED',
+    });
+  });
+
+  test('onCloudTrailWriteObject matches on the requestParameter bucketName when the path is not provided', () => {
+    const stack = new cdk.Stack();
+    const bucket = s3.Bucket.fromBucketAttributes(stack, 'Bucket', {
+      bucketName: 'MyBucket',
+    });
+    bucket.onCloudTrailWriteObject('OnCloudTrailWriteObjectRule', {
+      target: {
+        bind: () => ({ arn: 'ARN', id: '' }),
+      },
+    });
+
+    expect(stack).toHaveResourceLike('AWS::Events::Rule', {
+      'EventPattern': {
+        'source': [
+          'aws.s3',
+        ],
+        'detail': {
+          'requestParameters': {
+            'bucketName': [
+              bucket.bucketName,
+            ],
+          },
+        },
+      },
+    });
+  });
+
+  test('onCloudTrailWriteObject matches on the requestParameters bucketName and key when the path is provided', () => {
+    const stack = new cdk.Stack();
+    const bucket = s3.Bucket.fromBucketAttributes(stack, 'Bucket', {
+      bucketName: 'MyBucket',
+    });
+    bucket.onCloudTrailWriteObject('OnCloudTrailWriteObjectRule', {
+      target: {
+        bind: () => ({ arn: 'ARN', id: '' }),
+      },
+      paths: ['my/path.zip'],
+    });
+
+    expect(stack).toHaveResourceLike('AWS::Events::Rule', {
+      'EventPattern': {
+        'source': [
+          'aws.s3',
+        ],
+        'detail': {
+          'requestParameters': {
+            'bucketName': [
+              bucket.bucketName,
+            ],
+            'key': [
+              'my/path.zip',
+            ],
+          },
+        },
+      },
     });
   });
 });

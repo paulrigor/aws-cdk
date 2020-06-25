@@ -1,26 +1,27 @@
-import cdk = require('@aws-cdk/cdk');
-import path = require('path');
-import codebuild = require('../lib');
+import * as cdk from '@aws-cdk/core';
+import * as path from 'path';
+import * as codebuild from '../lib';
 
 class TestStack extends cdk.Stack {
   constructor(scope: cdk.App, id: string) {
     super(scope, id);
 
     new codebuild.Project(this, 'MyProject', {
-      buildSpec: {
-        version: "0.2",
+      buildSpec: codebuild.BuildSpec.fromObject({
+        version: '0.2',
         phases: {
           build: {
-            commands: [ 'ls' ]
-          }
-        }
-      },
+            commands: [ 'ls' ],
+          },
+        },
+      }),
+      grantReportGroupPermissions: false,
       /// !show
       environment: {
         buildImage: codebuild.LinuxBuildImage.fromAsset(this, 'MyImage', {
-          directory: path.join(__dirname, 'demo-image')
-        })
-      }
+          directory: path.join(__dirname, 'demo-image'),
+        }),
+      },
       /// !hide
     });
   }

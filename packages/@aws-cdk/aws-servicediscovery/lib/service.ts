@@ -1,5 +1,5 @@
-import elbv2 = require('@aws-cdk/aws-elasticloadbalancingv2');
-import { Construct, IResource, Resource } from '@aws-cdk/cdk';
+import * as elbv2 from '@aws-cdk/aws-elasticloadbalancingv2';
+import { Construct, Duration, IResource, Resource } from '@aws-cdk/core';
 import { AliasTargetInstance } from './alias-target-instance';
 import { CnameInstance, CnameInstanceBaseProps  } from './cname-instance';
 import { IInstance } from './instance';
@@ -98,9 +98,9 @@ export interface DnsServiceProps extends BaseServiceProps {
    * The amount of time, in seconds, that you want DNS resolvers to cache the settings for this
    * record.
    *
-   * @default 60
+   * @default Duration.minutes(1)
    */
-  readonly dnsTtlSec?: number;
+  readonly dnsTtl?: Duration;
 
   /**
    * The routing policy that you want to apply to all DNS records that AWS Cloud Map creates when you
@@ -138,6 +138,7 @@ abstract class ServiceBase extends Resource implements IService {
 }
 
 export interface ServiceAttributes {
+  readonly namespace: INamespace;
   readonly serviceName: string;
   readonly serviceId: string;
   readonly serviceArn: string;
@@ -152,7 +153,7 @@ export class Service extends ServiceBase {
 
   public static fromServiceAttributes(scope: Construct, id: string, attrs: ServiceAttributes): IService {
     class Import extends ServiceBase {
-      public namespace: INamespace;
+      public namespace: INamespace = attrs.namespace;
       public serviceId = attrs.serviceId;
       public serviceArn = attrs.serviceArn;
       public dnsRecordType = attrs.dnsRecordType;
@@ -199,7 +200,7 @@ export class Service extends ServiceBase {
     const namespaceType = props.namespace.type;
 
     // Validations
-    if (namespaceType === NamespaceType.Http && (props.routingPolicy || props.dnsRecordType)) {
+    if (namespaceType === NamespaceType.HTTP && (props.routingPolicy || props.dnsRecordType)) {
       throw new Error('Cannot specify `routingPolicy` or `dnsRecord` when using an HTTP namespace.');
     }
 
@@ -207,11 +208,11 @@ export class Service extends ServiceBase {
       throw new Error('Cannot specify both `healthCheckConfig` and `healthCheckCustomConfig`.');
     }
 
-    if (namespaceType === NamespaceType.DnsPrivate && props.healthCheck) {
+    if (namespaceType === NamespaceType.DNS_PRIVATE && props.healthCheck) {
       throw new Error('Cannot specify `healthCheckConfig` for a Private DNS namespace.');
     }
 
-    if (props.routingPolicy === RoutingPolicy.Multivalue
+    if (props.routingPolicy === RoutingPolicy.MULTIVALUE
         && props.dnsRecordType === DnsRecordType.CNAME) {
       throw new Error('Cannot use `CNAME` record when routing policy is `Multivalue`.');
     }
@@ -220,21 +221,21 @@ export class Service extends ServiceBase {
     // The same validation happens later on during the actual attachment
     // of LBs, but we need the property for the correct configuration of
     // routingPolicy anyway, so might as well do the validation as well.
-    if (props.routingPolicy === RoutingPolicy.Multivalue
+    if (props.routingPolicy === RoutingPolicy.MULTIVALUE
         && props.loadBalancer) {
       throw new Error('Cannot register loadbalancers when routing policy is `Multivalue`.');
     }
 
     if (props.healthCheck
-        && props.healthCheck.type === HealthCheckType.Tcp
+        && props.healthCheck.type === HealthCheckType.TCP
         && props.healthCheck.resourcePath) {
-          throw new Error('Cannot specify `resourcePath` when using a `TCP` health check.');
+      throw new Error('Cannot specify `resourcePath` when using a `TCP` health check.');
     }
 
     // Set defaults where necessary
     const routingPolicy = (props.dnsRecordType === DnsRecordType.CNAME) || props.loadBalancer
-      ? RoutingPolicy.Weighted
-      : RoutingPolicy.Multivalue;
+      ? RoutingPolicy.WEIGHTED
+      : RoutingPolicy.MULTIVALUE;
 
     const dnsRecordType = props.dnsRecordType || DnsRecordType.A;
 
@@ -245,20 +246,20 @@ export class Service extends ServiceBase {
       throw new Error('Must support `A` or `AAAA` records to register loadbalancers.');
     }
 
-    const dnsConfig: CfnService.DnsConfigProperty | undefined = props.namespace.type === NamespaceType.Http
+    const dnsConfig: CfnService.DnsConfigProperty | undefined = props.namespace.type === NamespaceType.HTTP
       ? undefined
       : {
-          dnsRecords: renderDnsRecords(dnsRecordType, props.dnsTtlSec),
-          namespaceId: props.namespace.namespaceId,
-          routingPolicy,
-        };
+        dnsRecords: renderDnsRecords(dnsRecordType, props.dnsTtl),
+        namespaceId: props.namespace.namespaceId,
+        routingPolicy,
+      };
 
     const healthCheckConfigDefaults = {
-      type: HealthCheckType.Http,
+      type: HealthCheckType.HTTP,
       failureThreshold: 1,
-      resourcePath: props.healthCheck && props.healthCheck.type !== HealthCheckType.Tcp
+      resourcePath: props.healthCheck && props.healthCheck.type !== HealthCheckType.TCP
         ? '/'
-        : undefined
+        : undefined,
     };
 
     const healthCheckConfig = props.healthCheck && { ...healthCheckConfigDefaults, ...props.healthCheck };
@@ -271,12 +272,12 @@ export class Service extends ServiceBase {
       dnsConfig,
       healthCheckConfig,
       healthCheckCustomConfig,
-      namespaceId: props.namespace.namespaceId
+      namespaceId: props.namespace.namespaceId,
     });
 
-    this.serviceName = service.serviceName;
-    this.serviceArn = service.serviceArn;
-    this.serviceId = service.serviceId;
+    this.serviceName = service.attrName;
+    this.serviceArn = service.attrArn;
+    this.serviceId = service.attrId;
     this.namespace = props.namespace;
     this.dnsRecordType = dnsRecordType;
     this.routingPolicy = routingPolicy;
@@ -289,7 +290,7 @@ export class Service extends ServiceBase {
     return new AliasTargetInstance(this, id, {
       service: this,
       dnsName: loadBalancer.loadBalancerDnsName,
-      customAttributes
+      customAttributes,
     });
   }
 
@@ -299,7 +300,7 @@ export class Service extends ServiceBase {
   public registerNonIpInstance(id: string, props: NonIpInstanceBaseProps): IInstance {
     return new NonIpInstance(this, id, {
       service: this,
-      ...props
+      ...props,
     });
   }
 
@@ -309,7 +310,7 @@ export class Service extends ServiceBase {
   public registerIpInstance(id: string, props: IpInstanceBaseProps): IInstance {
     return new IpInstance(this, id, {
       service: this,
-      ...props
+      ...props,
     });
   }
 
@@ -319,18 +320,18 @@ export class Service extends ServiceBase {
   public registerCnameInstance(id: string, props: CnameInstanceBaseProps): IInstance {
     return new CnameInstance(this, id, {
       service: this,
-      ...props
+      ...props,
     });
   }
 }
 
-function renderDnsRecords(dnsRecordType: DnsRecordType, dnsTtlSec?: number): CfnService.DnsRecordProperty[] {
-  const ttl = dnsTtlSec !== undefined ? dnsTtlSec : 60;
+function renderDnsRecords(dnsRecordType: DnsRecordType, dnsTtl: Duration = Duration.minutes(1)): CfnService.DnsRecordProperty[] {
+  const ttl = dnsTtl.toSeconds();
 
   if (dnsRecordType === DnsRecordType.A_AAAA) {
     return [{
       type: DnsRecordType.A,
-      ttl
+      ttl,
     }, {
       type: DnsRecordType.AAAA,
       ttl,
@@ -386,27 +387,27 @@ export enum DnsRecordType {
   /**
    * An A record
    */
-  A = "A",
+  A = 'A',
 
   /**
    * An AAAA record
    */
-  AAAA = "AAAA",
+  AAAA = 'AAAA',
 
   /**
    * Both an A and AAAA record
    */
-  A_AAAA = "A, AAAA",
+  A_AAAA = 'A, AAAA',
 
   /**
    * A Srv record
    */
-  SRV = "SRV",
+  SRV = 'SRV',
 
   /**
    * A CNAME record
    */
-  CNAME = "CNAME",
+  CNAME = 'CNAME',
 }
 
 export enum RoutingPolicy {
@@ -414,13 +415,13 @@ export enum RoutingPolicy {
    * Route 53 returns the applicable value from one randomly selected instance from among the instances that you
    * registered using the same service.
    */
-  Weighted = "WEIGHTED",
+  WEIGHTED = 'WEIGHTED',
 
   /**
    * If you define a health check for the service and the health check is healthy, Route 53 returns the applicable value
    * for up to eight instances.
    */
-  Multivalue = "MULTIVALUE",
+  MULTIVALUE = 'MULTIVALUE',
 }
 
 export enum HealthCheckType {
@@ -428,18 +429,18 @@ export enum HealthCheckType {
    * Route 53 tries to establish a TCP connection. If successful, Route 53 submits an HTTP request and waits for an HTTP
    * status code of 200 or greater and less than 400.
    */
-  Http = "HTTP",
+  HTTP = 'HTTP',
 
   /**
    * Route 53 tries to establish a TCP connection. If successful, Route 53 submits an HTTPS request and waits for an
    * HTTP status code of 200 or greater and less than 400.  If you specify HTTPS for the value of Type, the endpoint
    * must support TLS v1.0 or later.
    */
-  Https = "HTTPS",
+  HTTPS = 'HTTPS',
 
   /**
    * Route 53 tries to establish a TCP connection.
    * If you specify TCP for Type, don't specify a value for ResourcePath.
    */
-  Tcp = "TCP",
+  TCP = 'TCP',
 }

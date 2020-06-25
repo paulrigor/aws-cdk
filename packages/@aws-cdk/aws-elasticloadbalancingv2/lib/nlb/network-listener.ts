@@ -1,7 +1,10 @@
-import { Construct, IResource, Resource } from '@aws-cdk/cdk';
+import { Construct, Duration, IResource, Resource } from '@aws-cdk/core';
 import { BaseListener } from '../shared/base-listener';
 import { HealthCheck } from '../shared/base-target-group';
 import { Protocol, SslPolicy } from '../shared/enums';
+import { IListenerCertificate } from '../shared/listener-certificate';
+import { validateNetworkProtocol } from '../shared/util';
+import { NetworkListenerAction } from './network-listener-action';
 import { INetworkLoadBalancer } from './network-load-balancer';
 import { INetworkLoadBalancerTarget, INetworkTargetGroup, NetworkTargetGroup } from './network-target-group';
 
@@ -17,12 +20,31 @@ export interface BaseNetworkListenerProps {
   /**
    * Default target groups to load balance to
    *
+   * All target groups will be load balanced to with equal weight and without
+   * stickiness. For a more complex configuration than that, use
+   * either `defaultAction` or `addAction()`.
+   *
+   * Cannot be specified together with `defaultAction`.
+   *
    * @default - None.
    */
   readonly defaultTargetGroups?: INetworkTargetGroup[];
 
   /**
-   * Protocol for listener, expects TCP or TLS
+   * Default action to take for requests to this listener
+   *
+   * This allows full control of the default Action of the load balancer,
+   * including weighted forwarding. See the `NetworkListenerAction` class for
+   * all options.
+   *
+   * Cannot be specified together with `defaultTargetGroups`.
+   *
+   * @default - None.
+   */
+  readonly defaultAction?: NetworkListenerAction;
+
+  /**
+   * Protocol for listener, expects TCP, TLS, UDP, or TCP_UDP.
    *
    * @default - TLS if certificates are provided. TCP otherwise.
    */
@@ -33,7 +55,7 @@ export interface BaseNetworkListenerProps {
    *
    * @default - No certificates.
    */
-  readonly certificates?: INetworkListenerCertificateProps[];
+  readonly certificates?: IListenerCertificate[];
 
   /**
    * SSL Policy
@@ -45,12 +67,12 @@ export interface BaseNetworkListenerProps {
 
 /**
  * Properties for adding a certificate to a listener
+ *
+ * This interface exists for backwards compatibility.
+ *
+ * @deprecated Use IListenerCertificate instead
  */
-export interface INetworkListenerCertificateProps {
-  /**
-   * Certificate ARN from ACM
-   */
-  readonly certificateArn: string
+export interface INetworkListenerCertificateProps extends IListenerCertificate {
 }
 
 /**
@@ -87,18 +109,16 @@ export class NetworkListener extends BaseListener implements INetworkListener {
 
   constructor(scope: Construct, id: string, props: NetworkListenerProps) {
     const certs = props.certificates || [];
-    const proto = props.protocol || (certs.length > 0 ? Protocol.Tls : Protocol.Tcp);
+    const proto = props.protocol || (certs.length > 0 ? Protocol.TLS : Protocol.TCP);
 
-    if ([Protocol.Tcp, Protocol.Tls].indexOf(proto) === -1) {
-      throw new Error(`The protocol must be either ${Protocol.Tcp} or ${Protocol.Tls}. Found ${props.protocol}`);
+    validateNetworkProtocol(proto);
+
+    if (proto === Protocol.TLS && certs.filter(v => v != null).length === 0) {
+      throw new Error('When the protocol is set to TLS, you must specify certificates');
     }
 
-    if (proto === Protocol.Tls && certs.filter(v => v != null).length === 0) {
-      throw new Error(`When the protocol is set to TLS, you must specify certificates`);
-    }
-
-    if (proto !== Protocol.Tls && certs.length > 0) {
-      throw new Error(`Protocol must be TLS when certificates have been specified`);
+    if (proto !== Protocol.TLS && certs.length > 0) {
+      throw new Error('Protocol must be TLS when certificates have been specified');
     }
 
     super(scope, id, {
@@ -106,41 +126,67 @@ export class NetworkListener extends BaseListener implements INetworkListener {
       protocol: proto,
       port: props.port,
       sslPolicy: props.sslPolicy,
-      certificates: props.certificates
+      certificates: props.certificates,
     });
 
     this.loadBalancer = props.loadBalancer;
 
-    (props.defaultTargetGroups || []).forEach(this._addDefaultTargetGroup.bind(this));
+    if (props.defaultAction && props.defaultTargetGroups) {
+      throw new Error('Specify at most one of \'defaultAction\' and \'defaultTargetGroups\'');
+    }
+
+    if (props.defaultAction) {
+      this.setDefaultAction(props.defaultAction);
+    }
+
+    if (props.defaultTargetGroups) {
+      this.setDefaultAction(NetworkListenerAction.forward(props.defaultTargetGroups));
+    }
   }
 
   /**
    * Load balance incoming requests to the given target groups.
+   *
+   * All target groups will be load balanced to with equal weight and without
+   * stickiness. For a more complex configuration than that, use `addAction()`.
    */
   public addTargetGroups(_id: string, ...targetGroups: INetworkTargetGroup[]): void {
-    // New default target(s)
-    for (const targetGroup of targetGroups) {
-      this._addDefaultTargetGroup(targetGroup);
-      targetGroup.registerListener(this);
-    }
+    this.setDefaultAction(NetworkListenerAction.forward(targetGroups));
+  }
+
+  /**
+   * Perform the given Action on incoming requests
+   *
+   * This allows full control of the default Action of the load balancer,
+   * including weighted forwarding. See the `NetworkListenerAction` class for
+   * all options.
+   */
+  public addAction(_id: string, props: AddNetworkActionProps): void {
+    this.setDefaultAction(props.action);
   }
 
   /**
    * Load balance incoming requests to the given load balancing targets.
    *
-   * This method implicitly creates an ApplicationTargetGroup for the targets
-   * involved.
+   * This method implicitly creates a NetworkTargetGroup for the targets
+   * involved, and a 'forward' action to route traffic to the given TargetGroup.
+   *
+   * If you want more control over the precise setup, create the TargetGroup
+   * and use `addAction` yourself.
+   *
+   * It's possible to add conditions to the targets added in this way. At least
+   * one set of targets must be added without conditions.
    *
    * @returns The newly created target group
    */
   public addTargets(id: string, props: AddNetworkTargetsProps): NetworkTargetGroup {
     if (!this.loadBalancer.vpc) {
       // tslint:disable-next-line:max-line-length
-      throw new Error('Can only call addTargets() when using a constructed Load Balancer; construct a new TargetGroup and use addTargetGroup');
+      throw new Error('Can only call addTargets() when using a constructed Load Balancer or imported Load Balancer with specified VPC; construct a new TargetGroup and use addTargetGroup');
     }
 
     const group = new NetworkTargetGroup(this, id + 'Group', {
-      deregistrationDelaySec: props.deregistrationDelaySec,
+      deregistrationDelay: props.deregistrationDelay,
       healthCheck: props.healthCheck,
       port: props.port,
       proxyProtocolV2: props.proxyProtocolV2,
@@ -153,6 +199,14 @@ export class NetworkListener extends BaseListener implements INetworkListener {
 
     return group;
   }
+
+  /**
+   * Wrapper for _setDefaultAction which does a type-safe bind
+   */
+  private setDefaultAction(action: NetworkListenerAction) {
+    action.bind(this, this);
+    this._setDefaultAction(action);
+  }
 }
 
 /**
@@ -164,6 +218,16 @@ export interface INetworkListener extends IResource {
    * @attribute
    */
   readonly listenerArn: string;
+}
+
+/**
+ * Properties for adding a new action to a listener
+ */
+export interface AddNetworkActionProps {
+  /**
+   * Action to perform
+   */
+  readonly action: NetworkListenerAction;
 }
 
 /**
@@ -202,9 +266,9 @@ export interface AddNetworkTargetsProps {
    *
    * The range is 0-3600 seconds.
    *
-   * @default 300
+   * @default Duration.minutes(5)
    */
-  readonly deregistrationDelaySec?: number;
+  readonly deregistrationDelay?: Duration;
 
   /**
    * Indicates whether Proxy Protocol version 2 is enabled.

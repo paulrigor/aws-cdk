@@ -1,6 +1,6 @@
-import colors = require('colors/safe');
-import stringWidth = require('string-width');
-import table = require('table');
+import * as colors from 'colors/safe';
+import * as stringWidth from 'string-width';
+import * as table from 'table';
 
 /**
  * Render a two-dimensional array to a visually attractive table
@@ -14,7 +14,7 @@ export function formatTable(cells: string[][], columns: number | undefined): str
     drawHorizontalLine: (line) => {
       // Numbering like this: [line 0] [header = row[0]] [line 1] [row 1] [line 2] [content 2] [line 3]
       return (line < 2 || line === cells.length) || lineBetween(cells[line - 1], cells[line]);
-    }
+    },
   }).trimRight();
 }
 
@@ -54,7 +54,7 @@ function calculcateColumnWidths(rows: string[][], terminalWidth: number): number
   terminalWidth = Math.max(terminalWidth, 40);
 
   // use 'string-width' to not count ANSI chars as actual character width
-  const columns = rows[0].map((_, i) => Math.max(...rows.map(row => stringWidth(row[i]))));
+  const columns = rows[0].map((_, i) => Math.max(...rows.map(row => stringWidth(String(row[i])))));
 
   // If we have no terminal width, do nothing
   const contentWidth = terminalWidth - 2 - columns.length * 3;
@@ -111,5 +111,5 @@ const TABLE_BORDER_CHARACTERS =  {
   joinBody: tableColor('─'),
   joinLeft: tableColor('├'),
   joinRight: tableColor('┤'),
-  joinJoin: tableColor('┼')
+  joinJoin: tableColor('┼'),
 };

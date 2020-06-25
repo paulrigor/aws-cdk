@@ -39,80 +39,80 @@ export interface Type {
  * @see https://docs.aws.amazon.com/athena/latest/ug/data-types.html
  */
 export class Schema {
-  public static readonly boolean: Type = {
+  public static readonly BOOLEAN: Type = {
     isPrimitive: true,
-    inputString: 'boolean'
+    inputString: 'boolean',
   };
 
-  public static readonly binary: Type = {
+  public static readonly BINARY: Type = {
     isPrimitive: true,
-    inputString: 'binary'
+    inputString: 'binary',
   };
 
   /**
    * A 64-bit signed INTEGER in two’s complement format, with a minimum value of -2^63 and a maximum value of 2^63-1.
    */
-  public static readonly bigint: Type = {
+  public static readonly BIG_INT: Type = {
     isPrimitive: true,
-    inputString: 'bigint'
+    inputString: 'bigint',
   };
 
-  public static readonly double: Type = {
+  public static readonly DOUBLE: Type = {
     isPrimitive: true,
-    inputString: 'double'
+    inputString: 'double',
   };
 
-  public static readonly float: Type = {
+  public static readonly FLOAT: Type = {
     isPrimitive: true,
-    inputString: 'float'
+    inputString: 'float',
   };
 
   /**
    * A 32-bit signed INTEGER in two’s complement format, with a minimum value of -2^31 and a maximum value of 2^31-1.
    */
-  public static readonly integer: Type = {
+  public static readonly INTEGER: Type = {
     isPrimitive: true,
-    inputString: 'int'
+    inputString: 'int',
   };
 
   /**
    * A 16-bit signed INTEGER in two’s complement format, with a minimum value of -2^15 and a maximum value of 2^15-1.
    */
-  public static readonly smallint: Type = {
+  public static readonly SMALL_INT: Type = {
     isPrimitive: true,
-    inputString: 'smallint'
+    inputString: 'smallint',
   };
 
   /**
    * A 8-bit signed INTEGER in two’s complement format, with a minimum value of -2^7 and a maximum value of 2^7-1
    */
-  public static readonly tinyint: Type = {
+  public static readonly TINY_INT: Type = {
     isPrimitive: true,
-    inputString: 'tinyint'
+    inputString: 'tinyint',
   };
 
   /**
    * Date type.
    */
-  public static readonly date: Type = {
+  public static readonly DATE: Type = {
     isPrimitive: true,
-    inputString: 'date'
+    inputString: 'date',
   };
 
   /**
    * Timestamp type (date and time).
    */
-  public static readonly timestamp: Type = {
+  public static readonly TIMESTAMP: Type = {
     isPrimitive: true,
-    inputString: 'timestamp'
+    inputString: 'timestamp',
   };
 
   /**
    * Arbitrary-length string type.
    */
-  public static readonly string: Type = {
+  public static readonly STRING: Type = {
     isPrimitive: true,
-    inputString: 'string'
+    inputString: 'string',
   };
 
   /**
@@ -126,7 +126,7 @@ export class Schema {
   public static decimal(precision: number, scale?: number): Type {
     return {
       isPrimitive: true,
-      inputString: scale !== undefined ? `decimal(${precision},${scale})` : `decimal(${precision})`
+      inputString: scale !== undefined ? `decimal(${precision},${scale})` : `decimal(${precision})`,
     };
   }
 
@@ -144,7 +144,7 @@ export class Schema {
     }
     return {
       isPrimitive: true,
-      inputString: `char(${length})`
+      inputString: `char(${length})`,
     };
   }
 
@@ -162,7 +162,7 @@ export class Schema {
     }
     return {
       isPrimitive: true,
-      inputString: `varchar(${length})`
+      inputString: `varchar(${length})`,
     };
   }
 
@@ -174,7 +174,7 @@ export class Schema {
   public static array(itemType: Type): Type {
     return {
       isPrimitive: false,
-      inputString: `array<${itemType.inputString}>`
+      inputString: `array<${itemType.inputString}>`,
     };
   }
 
@@ -190,7 +190,7 @@ export class Schema {
     }
     return {
       isPrimitive: false,
-      inputString: `map<${keyType.inputString},${valueType.inputString}>`
+      inputString: `map<${keyType.inputString},${valueType.inputString}>`,
     };
   }
 
@@ -208,7 +208,7 @@ export class Schema {
         } else {
           return `${column.name}:${column.type.inputString} COMMENT '${column.comment}'`;
         }
-      }).join(',')}>`
+      }).join(',')}>`,
     };
   }
 }

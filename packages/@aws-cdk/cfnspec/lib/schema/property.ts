@@ -87,7 +87,8 @@ export interface ComplexMapProperty extends MapPropertyBase {
 }
 
 export interface TagPropertyStandard extends PropertyBase {
-  ItemType: 'Tag';
+  ItemType: 'Tag' | 'TagsEntry' | 'TagRef' | 'ElasticFileSystemTag' | 'HostedZoneTag';
+  Type: 'Tags';
 }
 
 export interface TagPropertyAutoScalingGroup extends PropertyBase {
@@ -124,16 +125,16 @@ export enum UpdateType {
 
 export function isUpdateType(str: string): str is UpdateType {
   switch (str) {
-  case UpdateType.Conditional:
-  case UpdateType.Immutable:
-  case UpdateType.Mutable:
-    return true;
-  default:
-    return false;
+    case UpdateType.Conditional:
+    case UpdateType.Immutable:
+    case UpdateType.Mutable:
+      return true;
+    default:
+      return false;
   }
 }
 
-export function isScalarPropery(prop: Property): prop is ScalarProperty {
+export function isScalarProperty(prop: Property): prop is ScalarProperty {
   return isPrimitiveProperty(prop)
     || isComplexProperty(prop)
     // A UnionProperty is only Scalar if it defines Types or PrimitiveTypes
@@ -221,6 +222,21 @@ export function isPropertyScrutinyType(str: string): str is PropertyScrutinyType
   return (PropertyScrutinyType as any)[str] !== undefined;
 }
 
+const tagPropertyNames = {
+  FileSystemTags: '',
+  HostedZoneTags: '',
+  Tags: '',
+  UserPoolTags: '',
+};
+
+export type TagPropertyName = keyof typeof tagPropertyNames;
+
+export function isTagPropertyName(name?: string): name is TagPropertyName {
+  if (undefined === name) {
+    return false;
+  }
+  return tagPropertyNames.hasOwnProperty(name);
+}
 /**
  * This function validates that the property **can** be a Tag Property
  *
@@ -237,7 +253,15 @@ export function isTagProperty(prop: Property): prop is TagProperty {
 }
 
 export function isTagPropertyStandard(prop: Property): prop is TagPropertyStandard {
-  return (prop as TagPropertyStandard).ItemType === 'Tag';
+  return (
+    (prop as TagPropertyStandard).ItemType === 'Tag' ||
+    (prop as TagPropertyStandard).ItemType === 'TagsEntry' ||
+    (prop as TagPropertyStandard).Type === 'Tags' ||
+    (prop as TagPropertyStandard).ItemType === 'TagRef' ||
+    (prop as TagPropertyStandard).ItemType === 'ElasticFileSystemTag' ||
+    (prop as TagPropertyStandard).ItemType === 'HostedZoneTag'
+  );
+
 }
 
 export function isTagPropertyAutoScalingGroup(prop: Property): prop is TagPropertyAutoScalingGroup {
